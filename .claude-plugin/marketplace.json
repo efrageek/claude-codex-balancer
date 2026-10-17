@@ -1,0 +1,5 @@
+{
+  "name": "claude-codex-balancer",
+  "owner": { "name": "Efrain P. Jaimes" },
+  "plugins": [{ "name": "balancer", "source": "./" }]
+}
