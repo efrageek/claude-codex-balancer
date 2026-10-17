@@ -112,12 +112,14 @@ No permission rule is needed. The plugin allows only the exact command it built 
 Keep these out of `permissions.allow`:
 
 - `Bash(codex exec:*)` or any broad Bash rule: it would let the model run Codex with any flags (sandbox bypass, MCP commands) without asking.
-- `mcp__balancer__codex_run`: leave it on the normal prompt so you see each Codex job before it starts.
+- `mcp__balancer__codex_run`: leave it unlisted so you confirm each Codex job (see below).
 - Other shell tools (desktop-commander `start_process`, terminal tools, Monitor): the Codex guard only covers Bash.
 
 The plugin also refuses Bash commands that look like a Codex launch (`codex` or `codex.js` as a word, or a path ending in `/codex`), including wrappers such as `timeout 20 codex`. This is a convenience, not the security boundary: a determined spelling can slip past it, and then your normal permission prompt is what stops it, so the rules above matter. It also refuses lowercase prose such as `-m "fix codex runs"`; capitalize or rephrase it.
 
 Only the main session can start Codex jobs: `codex_run` refuses calls from subagents.
+
+**Confirming jobs.** Before each Codex job the plugin asks you in Claude Code's own dialog, showing the tier, model, effort, folder, and any extra dirs or network. A `safe` job offers "Run, don't ask again this session", so in auto mode you confirm once; a `full` job asks every time. If your permission rules allow `codex_run` (or you run with permissions bypassed) it starts without asking; if they deny it, it never starts; with no one to ask (`claude -p`) it is refused.
 
 Defaults (mode, Codex model, Codex effort) are set in the plugin's config menu. The band and the commands change them for the current session only.
 

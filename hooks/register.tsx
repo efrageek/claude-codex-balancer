@@ -39,6 +39,10 @@ const parsedOf = new Map<string, { mtimeMs: number; r: Parsed }>()
 let isAllDone = true
 // The exact Bash commands this plugin is starting right now: the only Codex launches allowed.
 const owned = new Map<string, string>()
+const RUN = 'Run'
+const RUN_ALWAYS = "Run, don't ask again this session"
+// The person said yes to safe-tier jobs for the rest of this session (a reload asks again).
+let isSafeApproved = false
 
 async function homeDir($: $) {
   if (!home) home = (await $.process.run(['printenv', 'HOME'])).stdout.trim()
@@ -216,6 +220,20 @@ async function runCodex($: $, e: { tool_use_id?: string; agentId?: string }): Pr
   if (!/^[a-z]+$/.test(effort)) return { deny: 'balancer: codex_effort must be a level such as low or xhigh.' }
   const efforts = await effortsFor($, model)
   if (!efforts.includes(effort)) return { deny: `balancer: ${model} takes effort ${efforts.join(', ')}.` }
+  // This hook answers before the engine's own prompt for codex_run, so put the call to the person here.
+  const { decision } = await $.tool.check({ tool: TOOL, input: { dir: real, capabilities: tier } } as never)
+  if (decision === 'deny') return { deny: 'balancer: your permission settings deny codex_run.' }
+  if (decision !== 'allow' && !(tier === 'safe' && isSafeApproved)) {
+    const extras = [writableDirs.length ? `also writes ${writableDirs.join(', ')}` : '', input.network === true && tier === 'full' ? 'network on' : '']
+      .filter(Boolean)
+      .join(', ')
+    const options = tier === 'safe' ? [RUN, RUN_ALWAYS, 'Cancel'] : [RUN, 'Cancel']
+    const answer = await $.ui
+      .ask(`Start a Codex job (${tier} tier, ${model}/${effort}) in ${real}${extras ? `, ${extras}` : ''}?`, { options, header: 'Codex' })
+      .catch(() => '')
+    if (answer === RUN_ALWAYS) isSafeApproved = true
+    else if (answer !== RUN) return { deny: 'balancer: the Codex job was not confirmed (declined, dismissed, or no one to ask).' }
+  }
   const prompt =
     input.instructions ||
     'Read TASK.md and do it. Apply Ponytail (full). When done, write REPORT.md: what changed, tests run and their result, what you skipped.'
