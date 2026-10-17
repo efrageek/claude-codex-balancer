@@ -35,7 +35,9 @@ test('codex_run keeps full locked until the person unlocks it', async ($, on) =>
   mock.clock(on)
   const r = await $.tool.call({ tool: 'mcp__balancer__codex_run', dir: 'relative', capabilities: 'full' } as never)
   expect(r.deny ?? r.text).toContain('absolute')
-  await $.command.run({ command: 'codex-trust', args: 'full' } as never)
+  // A command raised from anywhere but the person's prompt cannot unlock full.
+  const relayed = await $.command.run({ command: 'codex-trust', args: 'full' } as never)
+  expect(relayed.text).toContain('only the person at the prompt')
   const t = await $.command.run({ command: 'codex-trust', args: '' } as never)
-  expect(t.text).toContain('full for this session')
+  expect(t.text).toContain('tier: safe')
 })

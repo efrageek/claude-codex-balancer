@@ -41,10 +41,11 @@ export function codexCommand(run: CodexRun): string {
     .join(' ')
 }
 
-// `codex` in command position (line start, after ; & | ( ` or a quote, or after npx/env/sudo/...), bare or by path.
-// Not a path segment (~/.codex/sessions) or a word in prose ("fix codex runs").
+// `codex` or `codex.js` as a standalone word anywhere (so `timeout 20 codex`, `$(which codex)` and wrappers count),
+// or a path ending in /codex or /codex.js. Not a path segment (~/.codex/sessions, codex-mod) or part of a name (codex_run).
+// Best effort: prose like `-m "fix codex runs"` is refused too, and a determined bypass still meets the permission prompt.
 export function isCodexCommand(command: string): boolean {
-  return /(^|[\n;&|(`'"]\s*|\b(npx|exec|env|sudo|time|nohup|xargs|command)\s+(\S+=\S*\s+)*)(\S*\/)?codex(\s|$)/.test(command)
+  return /(^|[^\w./-])codex(\.js)?(?=$|[\s;&|)`'"])|\/codex(\.js)?(?=$|[\s;&|)`'"])/.test(command)
 }
 
 // True when `path` is `root` or inside it; both already resolved (realPath).

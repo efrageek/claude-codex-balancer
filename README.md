@@ -93,7 +93,9 @@ Every `codex_run` job runs in Codex's `workspace-write` sandbox. Nothing ever pa
 | `safe` (default) | `--ignore-user-config`: none of your Codex plugins, MCP servers or hooks, and no network. It writes only in `dir`, which must sit inside the session's folder (a worktree works). | always on |
 | `full` | your whole Codex config (plugins, MCP servers, hooks), plus optional `network: true` and `writable_dirs`, and any `dir` | you, for this session only, with `/codex-trust full` or the `tier:` button in the band |
 
-The model asks for `full` when a task needs it and tells you why; it cannot unlock it. The unlock is not saved, so each session starts in `safe`.
+The model asks for `full` when a task needs it and tells you why; it cannot unlock it. `/codex-trust full` only works when typed at the prompt, not when it arrives as a relayed message. The unlock is not saved, so each session starts in `safe`. In `full`, `writable_dirs` may not be `/` or your home folder (or anything holding it).
+
+"The session's folder" is the folder the session runs in when the job starts; if the session moves to another folder, the allowed area moves with it.
 
 What stays risky in `full`: Codex is then your whole agent. A prompt injected through `TASK.md` or repository content could use your Codex plugins (Slack, browser, computer use) or read files outside the repo. Unlock it only for tasks that need it.
 
@@ -105,7 +107,17 @@ What stays risky in `full`: Codex is then your whole agent. A prompt injected th
 
 This is a private repository: installing needs GitHub access to it on your machine.
 
-No permission rule is needed. Do not add `Bash(codex exec:*)` to your settings: it would let the model run any Codex flags (sandbox bypass, MCP commands) without asking. The plugin allows only the exact command it built itself, and refuses `codex` commands the model writes on its own.
+No permission rule is needed. The plugin allows only the exact command it built itself (matched by the plugin's own origin, which nothing else can forge).
+
+Keep these out of `permissions.allow`:
+
+- `Bash(codex exec:*)` or any broad Bash rule: it would let the model run Codex with any flags (sandbox bypass, MCP commands) without asking.
+- `mcp__balancer__codex_run`: leave it on the normal prompt so you see each Codex job before it starts.
+- Other shell tools (desktop-commander `start_process`, terminal tools, Monitor): the Codex guard only covers Bash.
+
+The plugin also refuses Bash commands that look like a Codex launch (`codex` or `codex.js` as a word, or a path ending in `/codex`), including wrappers such as `timeout 20 codex`. This is a convenience, not the security boundary: a determined spelling can slip past it, and then your normal permission prompt is what stops it, so the rules above matter. It also refuses lowercase prose such as `-m "fix codex runs"`; capitalize or rephrase it.
+
+Only the main session can start Codex jobs: `codex_run` refuses calls from subagents.
 
 Defaults (mode, Codex model, Codex effort) are set in the plugin's config menu. The band and the commands change them for the current session only.
 

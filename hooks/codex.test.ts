@@ -26,10 +26,21 @@ test('recognizes codex as a command, not as a path', () => {
   expect(isCodexCommand('/usr/bin/codex e x')).toBe(true)
   expect(isCodexCommand('ls ~/.codex/sessions')).toBe(false)
   expect(isCodexCommand('cat codex-notes.md')).toBe(false)
-  expect(isCodexCommand('git commit -m "fix codex runs"')).toBe(false)
   expect(isCodexCommand("bash -c 'codex exec x'")).toBe(true)
   expect(isCodexCommand('ls && codex e x')).toBe(true)
   expect(isCodexCommand('env A=1 codex exec x')).toBe(true)
+  // The two bypasses the security gate ran live, and other wrappers.
+  expect(isCodexCommand('timeout 20 codex --version')).toBe(true)
+  expect(isCodexCommand('node /home/u/.nvm/lib/node_modules/@openai/codex/bin/codex.js --version')).toBe(true)
+  expect(isCodexCommand('nice -n 5 codex exec x')).toBe(true)
+  expect(isCodexCommand('$(which codex) exec x')).toBe(true)
+  expect(isCodexCommand('npx @openai/codex exec x')).toBe(true)
+  expect(isCodexCommand(`python3 -c "subprocess.run(['codex','exec'])"`)).toBe(true)
+  // Names and paths that only contain the word stay allowed.
+  expect(isCodexCommand('cd ~/Documents/codex-mod && git status')).toBe(false)
+  expect(isCodexCommand('grep -rn mcp__balancer__codex_run hooks')).toBe(false)
+  // Accepted false positive: lowercase prose is refused too.
+  expect(isCodexCommand('git commit -m "fix codex runs"')).toBe(true)
 })
 
 test('inside a root', () => {

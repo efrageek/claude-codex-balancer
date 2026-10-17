@@ -25,6 +25,7 @@ const tickRef = { plugin: 'balancer', key: 'tick' } as const
 const PANE = 'codex-log'
 
 const TOOL = 'mcp__balancer__codex_run'
+const CODEX_DENY = `balancer: run Codex through ${TOOL}, not Bash. If the word only appears in text (a commit message, a grep), capitalize or rephrase it.`
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
 const HAIKU_TYPES = new Set(['scout', 'Explore'])
 const CODEX_CHECK_MS = 5 * 60_000
@@ -168,7 +169,9 @@ async function openLog($: $, id?: string) {
   await $.ui.open({ id: PANE, title: 'Codex transcript' })
 }
 
-async function runCodex($: $, e: { tool_use_id?: string }): Promise<ToolCallResult> {
+async function runCodex($: $, e: { tool_use_id?: string; agentId?: string }): Promise<ToolCallResult> {
+  // Codex quota is the orchestrator's to spend; a subagent (possibly prompt-injected) must ask it instead.
+  if (e.agentId) return { deny: 'balancer: only the main session can start Codex jobs. Report back and let it call codex_run.' }
   const input = e as unknown as {
     dir?: string
     instructions?: string
@@ -201,12 +204,16 @@ async function runCodex($: $, e: { tool_use_id?: string }): Promise<ToolCallResu
   for (const d of input.writable_dirs ?? []) {
     const r = d.startsWith('/') ? (await $.fs.stat(d, { resolve: true }).catch(() => undefined))?.realPath : undefined
     if (!r) return { deny: `balancer: writable dir ${d} must be an existing absolute path.` }
+    // Never the whole disk or home: those would let Codex rewrite dotfiles, keys and other projects.
+    if (isInside(await homeDir($), r)) return { deny: `balancer: writable dir ${r} is too broad (it holds your home folder).` }
     writableDirs.push(r)
   }
   const c = await current($)
   const model = input.codex_model || c.model
   const effort = input.codex_effort || c.effort
-  if (model.startsWith('-')) return { deny: 'balancer: codex_model must be a model slug.' }
+  if (!/^[\w.-]+$/.test(model) || model.startsWith('-')) return { deny: 'balancer: codex_model must be a model slug.' }
+  // The effort lands inside a TOML string in `-c`: letters only.
+  if (!/^[a-z]+$/.test(effort)) return { deny: 'balancer: codex_effort must be a level such as low or xhigh.' }
   const efforts = await effortsFor($, model)
   if (!efforts.includes(effort)) return { deny: `balancer: ${model} takes effort ${efforts.join(', ')}.` }
   const prompt =
@@ -220,15 +227,19 @@ async function runCodex($: $, e: { tool_use_id?: string }): Promise<ToolCallResu
   const command = codexCommand({ model, effort, dir: real, prompt, tier, writableDirs, isNetworked: input.network === true })
   const callId = `balancer-${job.id}`
   owned.set(callId, command)
-  // A native background task: it shows in the tasks list beside subagents, with live output and a notification on exit.
-  const ran = await $.tool.call({
-    tool: 'Bash',
-    tool_use_id: callId,
-    command,
-    description: `Codex ${model}/${effort} ${tier} · ${real.split('/').pop()}`,
-    run_in_background: true,
-  })
-  owned.delete(callId)
+  let ran: ToolCallResult
+  try {
+    // A native background task: it shows in the tasks list beside subagents, with live output and a notification on exit.
+    ran = await $.tool.call({
+      tool: 'Bash',
+      tool_use_id: callId,
+      command,
+      description: `Codex ${model}/${effort} ${tier} · ${real.split('/').pop()}`,
+      run_in_background: true,
+    })
+  } finally {
+    owned.delete(callId)
+  }
   if (ran.deny !== undefined) return { deny: ran.deny }
   if (ran.isError) return { deny: ran.text ?? 'balancer: Bash could not start Codex.' }
   return {
@@ -321,19 +332,28 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('tool.call', { tool: TOOL }, ($, e) => runCodex($, e as unknown as { tool_use_id?: string }))
+  on('tool.call', { tool: TOOL }, ($, e) => runCodex($, e as unknown as { tool_use_id?: string; agentId?: string }))
 
   // Codex runs only through codex_run: the plugin allows its own exact command and refuses every other codex call.
   on('tool.check', { tool: 'Bash' }, ($, e, next) => {
     const command = String((e.input as { command?: unknown } | undefined)?.command ?? '')
     // The engine mints its own tool_use_id for a plugin's $.tool.call: match the exact command this plugin built.
     if (next.origin.plugin === 'balancer' && [...owned.values()].includes(command)) return { decision: 'allow' as const }
-    if (isCodexCommand(command)) return { decision: 'deny' as const, reason: `balancer: run Codex through ${TOOL}, not Bash.` }
+    if (isCodexCommand(command)) return { decision: 'deny' as const, reason: CODEX_DENY }
     return next(e)
-  }).catch(($, e, next) => next(e))
+    // If the guard itself fails, Codex still stays out; anything else gets the engine's verdict.
+  }).catch(($, e, next) =>
+    isCodexCommand(String((e.input as { command?: unknown } | undefined)?.command ?? ''))
+      ? { decision: 'deny' as const, reason: CODEX_DENY }
+      : next(e),
+  )
 
   on('command.run', { command: 'codex-trust' }, async ($, e) => {
     const arg = e.args.trim()
+    // Only the person at the prompt (or its remote bridge) unlocks full: not a message relayed from elsewhere.
+    const from = (e.origin as { kind?: string } | undefined)?.kind
+    if (arg === 'full' && from !== 'composer' && from !== 'bridge')
+      return { text: 'balancer: only the person at the prompt can unlock the full Codex tier.' }
     if (isTier(arg)) await $.state.set(trustRef, arg)
     else if (arg) return { text: `Unknown tier "${arg}". Use safe or full.` }
     const tier = (await $.state.get(trustRef)).value ?? 'safe'
