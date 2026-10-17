@@ -19,11 +19,70 @@ In every mode, exploration, scouting and data handling go to `scout` (forced ont
 
 ## What it adds
 
-- **Band above the prompt**: mode chips, the Codex model and effort pickers, a `transcript` button, quota bars for each window, the age of the last Codex reading, credits, and the current pace. `▾` collapses it to the control row and `▴` expands it again; the choice is remembered.
+- **Band above the prompt**: mode chips, the Codex model and effort pickers, the Codex tier button, a `transcript` button, quota bars, and the current decision and pace. Each control is explained in [The band, control by control](#the-band-control-by-control).
 - **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort, which can be overridden per call.
 - **Codex transcript pane**: lists every Codex job of the session, each one expandable, with messages, commands with their exit status and the last lines of output, diffs, and the final answer.
 - **Commands**: `/balance [auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
 - **Routing policy**: injected into the orchestrator's system prompt only (subagents don't get it). It holds no live figures, so the prompt cache survives.
+
+## The band, control by control
+
+```
+balance [auto] [light] [medium] [full] │ codex [gpt-6.1-sol ▾] [xhigh ▾] [tier: safe] [transcript]   ▾
+Claude 5h 9% · reset 1h                    Codex 7d 14% · reset 5d
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Claude 7d 67% · reset 1d                   read 8m ago · credits 62.5k
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+medium → 50/50 · pace Claude 0.8x · Codex 0.4x
+```
+
+Everything you pick in the band applies to this session only. Defaults for the next session come from the plugin's config menu.
+
+### `balance` chips: the mode
+
+The highlighted chip is the active mode. Picking one changes how the orchestrating Claude routes work from its next request on; `/balance <mode>` does the same.
+
+- **`light`**: Claude does almost everything. Codex gets only bounded code tasks: a clear spec, a known file list, implement plus tests, a refactor, a script. Pick it when Claude has quota to spare or the work needs Claude's context (MCP tools, live systems, client copy).
+- **`medium`**: code is split about half and half, alternating between Codex and the `coder` subagent. Pick it to spend both quotas evenly.
+- **`full`**: every code task (implementation, fixes, refactors, tests, scripts) goes to Codex. Claude only orchestrates, plans, reviews and criticizes. Launching `coder` is refused unless its description starts with `[non-code]` (client copy, tasks that need MCP or live context). Pick it when Claude's quota is the tight one.
+- **`auto`**: the mod picks `light`, `medium` or `full` for you from the pace of each quota, and the last line of the band shows what it picked and why (`auto → codex (Claude is burning faster)`). It is `medium` while either quota has no reading, `full` when Claude is 95% used, `light` when Codex is 95% used, and otherwise moves code to whichever side burns more than 1.25x slower.
+
+Whatever the mode, exploration, scouting and data handling go to `scout` on Haiku, and plans, reviews and the final gate stay on Claude.
+
+### `codex` pickers: model and effort
+
+- **Model** (`gpt-6.1-sol ▾`): the Codex model every `codex_run` job uses by default. The list comes from the models your Codex account can see (`~/.codex/models_cache.json`).
+- **Effort** (`xhigh ▾`): Codex's reasoning effort, from `low` to `ultra`. Only the levels the chosen model supports are offered. Higher effort thinks longer and spends more Codex quota per job.
+
+The orchestrator can still override model or effort for a single job when a task clearly needs it (a trivial edit at `low`, a hard one at `max`). The pickers only set the default. `/codex [model] [effort]` does the same as the pickers; `/codex high` changes only the effort.
+
+### `tier:` button: what Codex may touch
+
+Pressing it toggles between `safe` and `full` for this session; `/codex-trust safe|full` does the same. See [Codex tiers](#codex-tiers) below for what each one allows. Switching to `full` is your call: the model is told to ask you and say why, and `codex_run` refuses `full` until the switch is on.
+
+### `transcript` button
+
+It appears once the session has run a Codex job, and opens the **Codex transcript** pane (also `/codex-log`):
+
+- One row per job, newest first: `▸ 12:23 smoke · gpt-6.1-sol/low · ✓ 15s`. The status reads `● running`, `✓` with its duration when done, or `… waiting` before Codex opens its session.
+- Press a row to unfold or fold it. Several can be open at once; a new job opens on its own.
+- An unfolded job shows the task Codex got, its comments, each command with `✓` or `✗ exit N` and the last 12 lines of its output, file changes as short diffs, and the final answer.
+- It refreshes every few seconds while a job runs. On a very long run the oldest steps are hidden and the newest kept.
+
+Codex jobs also show up in Claude Code's own **Background tasks** list, next to subagents. That list shows Codex's raw output; the pane is the readable version.
+
+### Quota bars
+
+- **Left column, Claude**: one bar per window Claude reports, 5 hours and 7 days. The label gives the share used and when that window resets. The first reading arrives with Claude's first reply in the session.
+- **Right column, Codex**: the weekly window, read from Codex's own session logs. `read 8m ago` says how old that reading is, because Codex only records it while it runs; `credits` is your remaining Codex credit balance.
+
+### Last line: decision and pace
+
+`medium → 50/50` is where code goes now: `codex`, `claude` or `50/50`. In `auto` it adds the reason. **Pace** is the share of a quota used divided by the share of its window already elapsed. At 1.0x it runs out exactly at reset; below 1x you will finish the window with quota left; above 1x it runs out early, and the line turns to a warning color. The worse window of each side is shown.
+
+### `▾` / `▴`
+
+`▾` collapses the band to its control row and `▴` expands it again. This one choice is remembered across sessions.
 
 ## Codex tiers
 
