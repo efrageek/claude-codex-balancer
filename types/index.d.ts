@@ -21,6 +21,8 @@ declare module 'claude-code' {
       codexCredits: number
       /** Band shows only its control row. */
       isCompact: boolean
+      /** Codex tier the person unlocked for this session; never persisted. */
+      trust: 'safe' | 'full'
       models: CodexModel[]
       jobs: CodexJob[]
       /** Jobs unfolded in the transcript pane. */
