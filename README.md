@@ -64,10 +64,12 @@ Pressing it toggles between `safe` and `full` for this session; `/codex-trust sa
 
 It appears once the session has run a Codex job, and opens the **Codex transcript** pane (also `/codex-log`):
 
-- One row per job, newest first: `▸ 12:23 smoke · gpt-6.1-sol/low · ✓ 15s`. The status reads `● running`, `✓` with its duration when done, or `… waiting` before Codex opens its session.
+- One row per job, newest first: `▸ 12:23 smoke · gpt-6.1-sol/low · ✓ 15s`. The status reads `● running`, `✓` with its duration when done, `… waiting` before Codex opens its session, `⚠ stalled` or `■ stopped` (see the watchdog below).
 - Press a row to unfold or fold it. Several can be open at once; a new job opens on its own.
 - An unfolded job shows the task Codex got, its comments, each command with `✓` or `✗ exit N` and the last 12 lines of its output, file changes as short diffs, and the final answer.
 - It refreshes every few seconds while a job runs. On a very long run the oldest steps are hidden and the newest kept.
+
+**Watchdog.** Once a minute the plugin checks every running job. When one has written nothing to its rollout for the stall time (15 minutes by default, `stallMinutes` in the plugin config), or has not opened a Codex session after that long, it shows a toast, marks the row `⚠ stalled`, and wakes the session once with the reason, so the orchestrator can look or stop it. If the job moves again, the warning re-arms. A job whose process is gone without finishing shows `■ stopped`; finishing and dying are already reported by the background task's own notification, so the watchdog stays quiet about those. Raise `stallMinutes` if your jobs run long silent test suites.
 
 Codex jobs also show up in Claude Code's own **Background tasks** list, next to subagents. That list shows Codex's raw output; the pane is the readable version.
 

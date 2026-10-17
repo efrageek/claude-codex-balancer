@@ -48,6 +48,19 @@ export function isCodexCommand(command: string): boolean {
   return /(^|[^\w./-])codex(\.js)?(?=$|[\s;&|)`'"])|\/codex(\.js)?(?=$|[\s;&|)`'"])/.test(command)
 }
 
+// Minutes a running job has been silent, once that reaches `stallMs`; undefined while it is fine or done.
+// Silence counts from Codex's last write to its rollout, or from the start while it has none yet.
+export function stalledFor(now: number, startedAt: number, lastWriteMs: number | undefined, isDone: boolean, stallMs: number) {
+  if (isDone) return undefined
+  const silent = now - (lastWriteMs ?? startedAt)
+  return silent >= stallMs ? Math.floor(silent / 60_000) : undefined
+}
+
+// A pgrep -f pattern for the Codex process of a job: `exec ... -C <dir>` with the dir taken literally.
+export function codexProcessPattern(dir: string): string {
+  return `exec .*-C ${dir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`
+}
+
 // True when `path` is `root` or inside it; both already resolved (realPath).
 export function isInside(path: string, root: string): boolean {
   const r = root.endsWith('/') ? root : `${root}/`

@@ -23,6 +23,12 @@
       "description": "low to ultra; not every model supports max or ultra.",
       "options": ["low", "medium", "high", "xhigh", "max", "ultra"],
       "default": "xhigh"
+    },
+    "stallMinutes": {
+      "type": "number",
+      "title": "Codex stall warning (minutes)",
+      "description": "Warn when a running Codex job writes nothing for this long. Raise it if your jobs run long silent test suites.",
+      "default": 15
     }
   }
 }

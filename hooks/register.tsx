@@ -4,7 +4,7 @@ import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 import type { CodexJob, CodexModel, Mode, Win } from '../types'
 import { MODES, bar, decide, isMode, parseCodexCredits, parseCodexLimits, policyText, pressure, shortWindow, until } from './policy'
 import { MAX_MD, parseRollout, rolloutMeta, trimParts } from './rollout'
-import { TIERS, codexCommand, isCodexCommand, isInside, isTier } from './codex'
+import { TIERS, codexCommand, codexProcessPattern, isCodexCommand, isInside, isTier, stalledFor } from './codex'
 import type { Parsed } from './rollout'
 
 type $ = EngineInterface
@@ -43,6 +43,10 @@ const RUN = 'Run'
 const RUN_ALWAYS = "Run, don't ask again this session"
 // The person said yes to safe-tier jobs for the rest of this session (a reload asks again).
 let isSafeApproved = false
+let stallMs = 15 * 60_000
+// Watchdog marks, by job id: warned once per stall, and jobs whose process is gone.
+const stalledJobs = new Set<string>()
+const endedJobs = new Set<string>()
 
 async function homeDir($: $) {
   if (!home) home = (await $.process.run(['printenv', 'HOME'])).stdout.trim()
@@ -167,6 +171,37 @@ async function readRollout($: $, path: string) {
   return r
 }
 
+// The watchdog: once a minute, flag running jobs that went silent. Finishing or dying is the
+// native background task's own notification; only a stall would otherwise go unnoticed.
+async function checkStalls($: $) {
+  const now = await $.clock.now()
+  for (const job of (await $.state.get(jobsRef)).value ?? []) {
+    if (endedJobs.has(job.id) || now - job.startedAt < 60_000) continue
+    const path = await findRollout($, job, job.dir)
+    const r = path ? await readRollout($, path) : undefined
+    const isAlive = (await $.process.run(['pgrep', '-f', '--', codexProcessPattern(job.dir)])).exitCode === 0
+    if (r?.isDone || !isAlive) {
+      // Done, or gone without finishing: either way not a stall, and the task notification said how it ended.
+      if (!r?.isDone) endedJobs.add(job.id)
+      stalledJobs.delete(job.id)
+      continue
+    }
+    const lastWrite = path ? (await $.fs.stat(path)).mtimeMs : undefined
+    const minutes = stalledFor(now, job.startedAt, lastWrite, false, stallMs)
+    if (minutes === undefined) {
+      stalledJobs.delete(job.id) // it moved again: re-arm
+      continue
+    }
+    if (stalledJobs.has(job.id)) continue
+    stalledJobs.add(job.id)
+    const where = job.dir.split('/').pop()
+    $.ui.toast(`Codex stalled ${minutes} min · ${where}`)
+    await $.prompt.submit({
+      text: `balancer watchdog: Codex job ${job.id} in ${job.dir} (${job.model}/${job.effort}) ${path ? `has written nothing for ${minutes} min` : `has not opened its session after ${minutes} min`}. Its process is still running. Check its background task output or the Codex transcript pane; if it is stuck, stop that background task and tell the user.`,
+    })
+  }
+}
+
 async function openLog($: $, id?: string) {
   if (id) await update($, expandedRef, ids => [...new Set([...(ids ?? []), id])])
   isAllDone = false
@@ -271,6 +306,7 @@ export const register: Register = (on, options) => {
     model: String(options.codexModel || 'gpt-6.1-sol'),
     effort: String(options.codexEffort || 'xhigh'),
   }
+  stallMs = Math.max(1, Number(options.stallMinutes) || 15) * 60_000
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -307,6 +343,7 @@ export const register: Register = (on, options) => {
       if (isAllDone || !(await $.ui.panes()).some(p => p.id === PANE)) return
       await update($, tickRef, n => (n ?? 0) + 1)
     })
+    $.clock.every(60_000, () => checkStalls($).catch(() => {}))
     // The band's size is a preference: kept across sessions.
     await $.state.set(compactRef, (await $.store.get('isCompact')) === true)
     await Promise.all([loadModels($), readCodexQuota($).catch(() => {}), readClaudeQuota($).catch(() => {})])
@@ -426,7 +463,7 @@ export const register: Register = (on, options) => {
         return { job, r: path ? await readRollout($, path) : undefined }
       }),
     )
-    isAllDone = rows.every(({ r }) => r?.isDone)
+    isAllDone = rows.every(({ job, r }) => r?.isDone || endedJobs.has(job.id))
     // The pane's text budget is shared by the unfolded jobs.
     const open = rows.filter(({ job }) => expanded.has(job.id)).length
     const budget = Math.floor(MAX_MD / Math.max(1, open))
@@ -441,7 +478,15 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         {rows.map(({ job, r }) => {
           const isOpen = expanded.has(job.id)
-          const state = r ? (r.isDone ? `✓ ${r.durationMs ? `${Math.round(r.durationMs / 1000)}s` : 'done'}` : '● running') : '… waiting'
+          const state = r?.isDone
+            ? `✓ ${r.durationMs ? `${Math.round(r.durationMs / 1000)}s` : 'done'}`
+            : endedJobs.has(job.id)
+              ? '■ stopped'
+              : stalledJobs.has(job.id)
+                ? '⚠ stalled'
+                : r
+                  ? '● running'
+                  : '… waiting'
           return (
             <Box key={`row-${job.id}`} flexDirection="column">
               <Button

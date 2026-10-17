@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { codexCommand, isCodexCommand, isInside, shellQuote } from './codex'
+import { codexCommand, codexProcessPattern, isCodexCommand, isInside, shellQuote, stalledFor } from './codex'
 
 const base = { model: 'gpt-6.1-sol', effort: 'low', dir: '/w/repo', prompt: "do it's job" }
 
@@ -41,6 +41,18 @@ test('recognizes codex as a command, not as a path', () => {
   expect(isCodexCommand('grep -rn mcp__balancer__codex_run hooks')).toBe(false)
   // Accepted false positive: lowercase prose is refused too.
   expect(isCodexCommand('git commit -m "fix codex runs"')).toBe(true)
+})
+
+test('stall: silent long enough, never when done', () => {
+  const min = 60_000
+  expect(stalledFor(20 * min, 0, 10 * min, false, 15 * min)).toBe(undefined) // wrote 10 min ago
+  expect(stalledFor(30 * min, 0, 10 * min, false, 15 * min)).toBe(20)
+  expect(stalledFor(16 * min, 0, undefined, false, 15 * min)).toBe(16) // never opened a session
+  expect(stalledFor(60 * min, 0, 0, true, 15 * min)).toBe(undefined)
+  const pattern = new RegExp(codexProcessPattern('/w/my.repo'))
+  expect(pattern.test("codex exec -m x -s workspace-write -C /w/my.repo -- 'p'")).toBe(true)
+  expect(pattern.test('codex exec -C /w/myXrepo -- p')).toBe(false)
+  expect(pattern.test('codex exec -C /w/my.repo2 -- p')).toBe(false)
 })
 
 test('inside a root', () => {
