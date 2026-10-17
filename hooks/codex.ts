@@ -4,6 +4,11 @@ export type CodexTier = 'safe' | 'full'
 export const TIERS: readonly CodexTier[] = ['safe', 'full']
 export const isTier = (s: unknown): s is CodexTier => TIERS.includes(s as CodexTier)
 
+// The tier a job runs in: what the model asked for, else the one the person picked in the band.
+export function pickTier(requested: string | undefined, isTrusted: boolean): string {
+  return requested ?? (isTrusted ? 'full' : 'safe')
+}
+
 export function shellQuote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`
 }

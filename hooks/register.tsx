@@ -4,7 +4,7 @@ import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 import type { CodexJob, CodexModel, Mode, Win } from '../types'
 import { MODES, bar, decide, isMode, parseCodexCredits, parseCodexLimits, policyText, pressure, shortWindow, until } from './policy'
 import { MAX_MD, parseRollout, rolloutMeta, trimParts } from './rollout'
-import { TIERS, codexCommand, codexProcessPattern, isCodexCommand, isInside, isTier, stalledFor } from './codex'
+import { TIERS, codexCommand, codexProcessPattern, isCodexCommand, isInside, isTier, pickTier, stalledFor } from './codex'
 import type { Parsed } from './rollout'
 
 type $ = EngineInterface
@@ -226,10 +226,11 @@ async function runCodex($: $, e: { tool_use_id?: string; agentId?: string }): Pr
   if (!real) return { deny: `balancer: ${dir} does not exist.` }
   const stat = await $.fs.stat(`${real}/TASK.md`).catch(() => undefined)
   if (stat?.kind !== 'file') return { deny: `balancer: ${real}/TASK.md not found. Write the task there first.` }
-  const tier = input.capabilities ?? 'safe'
-  if (!isTier(tier)) return { deny: `balancer: capabilities must be ${TIERS.join(' or ')}.` }
   // Only the person unlocks full, by /codex-trust full or the band button: never the model.
   const isTrusted = (await $.state.get(trustRef)).value === 'full'
+  // The band's tier is the default; the model may still ask for safe on one job.
+  const tier = pickTier(input.capabilities, isTrusted)
+  if (!isTier(tier)) return { deny: `balancer: capabilities must be ${TIERS.join(' or ')}.` }
   if (tier === 'full' && !isTrusted)
     return {
       deny: 'balancer: capabilities "full" is locked. Ask the user to run /codex-trust full (or press the "tier: safe" button in the band), and tell them why this task needs it.',
@@ -329,7 +330,7 @@ export const register: Register = (on, options) => {
             type: 'string',
             enum: TIERS,
             description:
-              "safe (default): Codex without the user config (no plugins, MCP servers or hooks, no network), writing only in dir. full: the user's whole Codex (plugins, MCP, optional network and extra dirs); works only after the user runs /codex-trust full, so ask them first and say why.",
+              "Leave it out to use the tier the user picked in the band (safe unless they switched to full). safe: Codex without the user config (no plugins, MCP servers or hooks, no network), writing only in dir. full: the user's whole Codex (plugins, MCP, optional network and extra dirs); works only after the user switches to full, so if the task needs it ask them and say why. Pass safe to keep one job limited even when full is on.",
           },
           writable_dirs: { type: 'array', items: { type: 'string' }, description: 'full only: extra absolute dirs Codex may write.' },
           network: { type: 'boolean', description: 'full only: let Codex shell commands reach the network.' },

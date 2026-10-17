@@ -58,7 +58,7 @@ The orchestrator can still override model or effort for a single job when a task
 
 ### `tier:` button: what Codex may touch
 
-Pressing it toggles between `safe` and `full` for this session; `/codex-trust safe|full` does the same. See [Codex tiers](#codex-tiers) below for what each one allows. Switching to `full` is your call: the model is told to ask you and say why, and `codex_run` refuses `full` until the switch is on.
+Pressing it toggles between `safe` and `full` for this session; `/codex-trust safe|full` does the same. It is the tier new Codex jobs run in: with `full` on, jobs get your whole Codex unless the model asks for `safe` on a job that doesn't need it. See [Codex tiers](#codex-tiers) below for what each one allows. Switching to `full` is your call: while it is off, the model is told to ask you and say why, and `codex_run` refuses `full`. Each `full` job still asks you to confirm before it starts.
 
 ### `transcript` button
 
@@ -92,10 +92,10 @@ Every `codex_run` job runs in Codex's `workspace-write` sandbox. Nothing ever pa
 
 | Tier | What Codex gets | Who picks it |
 |---|---|---|
-| `safe` (default) | `--ignore-user-config`: none of your Codex plugins, MCP servers or hooks, and no network. It writes only in `dir`, which must sit inside the session's folder (a worktree works). | always on |
-| `full` | your whole Codex config (plugins, MCP servers, hooks), plus optional `network: true` and `writable_dirs`, and any `dir` | you, for this session only, with `/codex-trust full` or the `tier:` button in the band |
+| `safe` (default) | `--ignore-user-config`: none of your Codex plugins, MCP servers or hooks, and no network. It writes only in `dir`, which must sit inside the session's folder (a worktree works). | the default; the model can also pick it for one job while `full` is on |
+| `full` | your whole Codex config (plugins, MCP servers, hooks), plus optional `network: true` and `writable_dirs`, and any `dir` | you, for this session only, with `/codex-trust full` or the `tier:` button in the band; then it is the default for new jobs |
 
-The model asks for `full` when a task needs it and tells you why; it cannot unlock it. `/codex-trust full` only works when typed at the prompt, not when it arrives as a relayed message. The unlock is not saved, so each session starts in `safe`. In `full`, `writable_dirs` may not be `/` or your home folder (or anything holding it).
+While `full` is off, the model asks you for it when a task needs it and tells you why; it cannot switch it on. `/codex-trust full` only works when typed at the prompt, not when it arrives as a relayed message. The unlock is not saved, so each session starts in `safe`. In `full`, `writable_dirs` may not be `/` or your home folder (or anything holding it).
 
 "The session's folder" is the folder the session runs in when the job starts; if the session moves to another folder, the allowed area moves with it.
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { codexCommand, codexProcessPattern, isCodexCommand, isInside, shellQuote, stalledFor } from './codex'
+import { codexCommand, codexProcessPattern, isCodexCommand, isInside, pickTier, shellQuote, stalledFor } from './codex'
 
 const base = { model: 'gpt-6.1-sol', effort: 'low', dir: '/w/repo', prompt: "do it's job" }
 
@@ -53,6 +53,13 @@ test('stall: silent long enough, never when done', () => {
   expect(pattern.test("codex exec -m x -s workspace-write -C /w/my.repo -- 'p'")).toBe(true)
   expect(pattern.test('codex exec -C /w/myXrepo -- p')).toBe(false)
   expect(pattern.test('codex exec -C /w/my.repo2 -- p')).toBe(false)
+})
+
+test('the band tier is the default; the model can narrow it to safe', () => {
+  expect(pickTier(undefined, false)).toBe('safe')
+  expect(pickTier(undefined, true)).toBe('full')
+  expect(pickTier('safe', true)).toBe('safe')
+  expect(pickTier('full', false)).toBe('full') // still refused later: full stays locked until the person switches it on
 })
 
 test('inside a root', () => {
