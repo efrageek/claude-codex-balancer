@@ -19,7 +19,10 @@ function code(text: string): string {
   return run ? `${f} ${text} ${f}` : `${f}${text}${f}`
 }
 
-const lines = (s: string) => s.replace(/\n+$/, '').split('\n')
+// Markdown takes no control characters but tab and newline: drop ANSI escapes and the rest.
+const clean = (s: string) => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
+
+const lines = (s: string) => clean(s).replace(/\n+$/, '').split('\n')
 
 // Keeps the head (a command reads top-down) or the tail (output ends with the result).
 function keep(s: string, n: number, end: 'head' | 'tail'): string {
@@ -33,7 +36,7 @@ type Item = Record<string, unknown> & { type: string }
 type Text = { text?: string }
 
 const texts = (content: unknown) =>
-  (Array.isArray(content) ? (content as Text[]) : []).map(c => c.text ?? '').filter(Boolean).join('\n')
+  clean((Array.isArray(content) ? (content as Text[]) : []).map(c => c.text ?? '').filter(Boolean).join('\n'))
 
 function command(it: Item): string {
   const cmd = (Array.isArray(it.command) ? String(it.command[it.command.length - 1]) : String(it.command ?? '')).trim()
@@ -122,8 +125,4 @@ export function rolloutMeta(firstLine: string): { cwd?: string; startedAt?: numb
   } catch {
     return {}
   }
-}
-
-export function shellQuote(s: string): string {
-  return `'${s.replaceAll("'", `'\\''`)}'`
 }

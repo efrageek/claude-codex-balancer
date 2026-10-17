@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { renderRollout, rolloutMeta, shellQuote } from './rollout'
+import { renderRollout, rolloutMeta } from './rollout'
 
 const ev = (payload: unknown) => JSON.stringify({ type: 'event_msg', payload })
 const done = (item: unknown) => ev({ type: 'item_completed', item })
@@ -48,8 +48,13 @@ test('long command output keeps its tail', () => {
   expect(r.markdown.includes('line 5\n')).toBe(false)
 })
 
-test('meta and quoting', () => {
+test('control characters never reach the pane', () => {
+  const r = renderRollout(done({ type: 'CommandExecution', command: ['bash', '-lc', 'x'], aggregated_output: '\x1b[31mred\x1b[0m\r\nok\x07', exit_code: 0 }))
+  expect(r.markdown).toContain('red\nok')
+  expect(/[\x00-\x08\x0b-\x1f\x7f]/.test(r.markdown)).toBe(false)
+})
+
+test('meta', () => {
   const meta = rolloutMeta(JSON.stringify({ type: 'session_meta', payload: { cwd: '/w', timestamp: '2026-10-17T10:06:16.133Z' } }))
   expect(meta).toEqual({ cwd: '/w', startedAt: Date.parse('2026-10-17T10:06:16.133Z') })
-  expect(shellQuote("it's")).toBe(`'it'\\''s'`)
 })
