@@ -1,0 +1,28 @@
+{
+  "name": "balancer",
+  "version": "0.1.0",
+  "description": "Balances subagent work between Claude models and Codex CLI by quota: auto, light, medium, full.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "mode": {
+      "type": "string",
+      "title": "Default balance mode",
+      "description": "auto: by quota pace. light: Claude first, Codex for bounded code tasks. medium: code split by quota. full: Codex for all code, Claude orchestrates and reviews.",
+      "options": ["auto", "light", "medium", "full"],
+      "default": "light"
+    },
+    "codexModel": {
+      "type": "string",
+      "title": "Default Codex model",
+      "description": "A slug from ~/.codex/models_cache.json.",
+      "default": "gpt-6.1-sol"
+    },
+    "codexEffort": {
+      "type": "string",
+      "title": "Default Codex reasoning effort",
+      "description": "low to ultra; not every model supports max or ultra.",
+      "options": ["low", "medium", "high", "xhigh", "max", "ultra"],
+      "default": "xhigh"
+    }
+  }
+}
