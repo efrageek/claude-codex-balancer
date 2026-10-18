@@ -1,6 +1,6 @@
 {
   "name": "balancer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Balances subagent work between Claude models and Codex CLI by quota: auto, light, medium, full.",
   "types": "./types/index.d.ts",
   "userConfig": {
