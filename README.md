@@ -21,7 +21,7 @@ In every mode, exploration, scouting and data handling go to `scout` (forced ont
 ## What it adds
 
 - **Band above the prompt**: mode chips, the Codex model and effort pickers, the Codex tier button, a `transcript` button, quota bars, and the current decision and pace. Each control is explained in [The band, control by control](#the-band-control-by-control).
-- **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort, which can be overridden per call.
+- **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort; a call can pick another model or a lower effort, never a higher one.
 - **Codex transcript pane**: lists every Codex job of the session, each one expandable, with messages, commands with their exit status and the last lines of output, diffs, and the final answer.
 - **Commands**: `/balance [off|auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
 - **Routing policy**: injected into the orchestrator's system prompt only (subagents don't get it). It holds no live figures, so the prompt cache survives.
@@ -56,7 +56,7 @@ Whatever the mode, exploration, scouting and data handling go to `scout` on Haik
 - **Model** (`gpt-6.1-sol ▾`): the Codex model every `codex_run` job uses by default. The list comes from the models your Codex account can see (`~/.codex/models_cache.json`).
 - **Effort** (`xhigh ▾`): Codex's reasoning effort, from `low` to `ultra`. Only the levels the chosen model supports are offered. Higher effort thinks longer and spends more Codex quota per job.
 
-The orchestrator can still override model or effort for a single job when a task clearly needs it (a trivial edit at `low`, a hard one at `max`). The pickers only set the default. `/codex [model] [effort]` does the same as the pickers; `/codex high` changes only the effort.
+The orchestrator can still pick another model for a single job when a task clearly needs it. Effort is different: the band's effort is a ceiling. The orchestrator may lower it for a small job (a trivial edit at `low`), but a higher request is capped to the band's level and the tool result says so. `/codex [model] [effort]` does the same as the pickers; `/codex high` changes only the effort.
 
 ### `tier:` button: what Codex may touch
 

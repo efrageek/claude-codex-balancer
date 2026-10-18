@@ -9,6 +9,14 @@ export function pickTier(requested: string | undefined, isTrusted: boolean): str
   return requested ?? (isTrusted ? 'full' : 'safe')
 }
 
+// The band's effort is a ceiling: a job may ask for less, never more. Unknown levels pass through for the caller to reject.
+export function capEffort(requested: string | undefined, ceiling: string, order: readonly string[]): string {
+  if (!requested) return ceiling
+  const at = order.indexOf(requested)
+  const max = order.indexOf(ceiling)
+  return at > max && max >= 0 ? ceiling : requested
+}
+
 export function shellQuote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`
 }

@@ -1,6 +1,16 @@
 import { expect, test } from 'claude-code/testing'
 
-import { codexCommand, codexProcessPattern, isCodexCommand, isInside, pickTier, shellQuote, stalledFor } from './codex'
+import { capEffort, codexCommand, codexProcessPattern, isCodexCommand, isInside, pickTier, shellQuote, stalledFor } from './codex'
+
+test('the band effort caps the requested effort', () => {
+  const order = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+  expect(capEffort('max', 'high', order)).toBe('high')
+  expect(capEffort(undefined, 'high', order)).toBe('high')
+  expect(capEffort('', 'high', order)).toBe('high')
+  expect(capEffort('high', 'high', order)).toBe('high')
+  expect(capEffort('low', 'high', order)).toBe('low')
+  expect(capEffort('bogus', 'high', order)).toBe('bogus') // left for the caller's check to refuse
+})
 
 const base = { model: 'gpt-6.1-sol', effort: 'low', dir: '/w/repo', prompt: "do it's job" }
 
