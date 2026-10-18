@@ -53,3 +53,10 @@ test('credits and bars', () => {
   expect(bar(50, 10)).toEqual(['━━━━━', '━━━━━'])
   expect(bar(140, 4)).toEqual(['━━━━', ''])
 })
+
+test('off routes nothing', () => {
+  expect(decide('off', [], [], 0).mode).toBe('off')
+  const off = policyText('off', decide('off', [], [], 0), 'm', 'xhigh', 't')
+  expect(off).toContain('balancing off')
+  expect(off.includes('Haiku')).toBe(false)
+})

@@ -1,10 +1,10 @@
 import type { Mode, Win } from '../types'
 
-export const MODES: readonly Mode[] = ['auto', 'light', 'medium', 'full']
+export const MODES: readonly Mode[] = ['off', 'auto', 'light', 'medium', 'full']
 const CLAUDE_WINDOW_MINUTES: Record<string, number> = { five_hour: 300, seven_day: 10080 }
 
-export type Fixed = Exclude<Mode, 'auto'>
-export type Decision = { mode: Fixed; why: string }
+export type Fixed = Exclude<Mode, 'auto' | 'off'>
+export type Decision = { mode: Fixed | 'off'; why: string }
 
 export const isMode = (s: unknown): s is Mode => MODES.includes(s as Mode)
 
@@ -32,6 +32,7 @@ const maxUsed = (ws: Win[], now: number) =>
 export function decide(mode: Mode, claude: Win[], codex: Win[], now: number): Decision {
   const cp = worst(claude, now)
   const xp = worst(codex, now)
+  if (mode === 'off') return { mode, why: 'balancing off' }
   if (mode !== 'auto') return { mode, why: 'manual' }
   if (maxUsed(codex, now) >= 95) return { mode: 'light', why: 'Codex nearly exhausted' }
   if (maxUsed(claude, now) >= 95) return { mode: 'full', why: 'Claude nearly exhausted' }
@@ -54,6 +55,8 @@ const CODE_RULE: Record<Fixed, () => string> = {
 
 // Kept free of live figures: this text sits in the system prompt, and any change there busts the prompt cache.
 export function policyText(mode: Mode, d: Decision, model: string, effort: string, tool: string): string {
+  if (d.mode === 'off')
+    return `# Balancer: off\nThe user turned Claude/Codex balancing off. Use Claude subagents as usual, and start Codex (\`${tool}\`) only when the user asks for it.`
   return [
     '# Balancer: subagent routing',
     `Balance mode: ${mode}${mode === 'auto' ? ` (acting as ${d.mode}: ${d.why})` : ''}. This overrides any other routing rule about Claude vs Codex.`,

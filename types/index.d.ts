@@ -1,4 +1,4 @@
-export type Mode = 'auto' | 'light' | 'medium' | 'full'
+export type Mode = 'off' | 'auto' | 'light' | 'medium' | 'full'
 export type Win = { kind: string; percentUsed: number; resetsAt?: string; minutes?: number }
 export type CodexModel = { slug: string; efforts: string[] }
 export type CodexJob = {

@@ -7,8 +7,8 @@
     "mode": {
       "type": "string",
       "title": "Default balance mode",
-      "description": "auto: by quota pace. light: Claude first, Codex for bounded code tasks. medium: code split by quota. full: Codex for all code, Claude orchestrates and reviews.",
-      "options": ["auto", "light", "medium", "full"],
+      "description": "off: no routing, the mod only shows quotas and runs Codex when asked. auto: by quota pace. light: Claude first, Codex for bounded code tasks. medium: code split by quota. full: Codex for all code, Claude orchestrates and reviews.",
+      "options": ["off", "auto", "light", "medium", "full"],
       "default": "light"
     },
     "codexModel": {

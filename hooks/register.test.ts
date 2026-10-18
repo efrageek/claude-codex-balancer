@@ -41,3 +41,11 @@ test('codex_run keeps full locked until the person unlocks it', async ($, on) =>
   const t = await $.command.run({ command: 'codex-trust', args: '' } as never)
   expect(t.text).toContain('tier: safe')
 })
+
+test('off leaves subagents alone', async ($, on) => {
+  mock.clock(on)
+  on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit' }))
+  await $.command.run({ command: 'balance', args: 'off' } as never)
+  const scout = await $.agent.spawn({ prompt: 'map', subagentType: 'scout', description: 'map' } as never)
+  expect(scout.model).toBe('inherit')
+})

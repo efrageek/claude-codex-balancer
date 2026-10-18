@@ -311,7 +311,7 @@ export const register: Register = (on, options) => {
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
-    await $.command.register({ name: 'balance', description: 'Balance mode: /balance [auto|light|medium|full]' })
+    await $.command.register({ name: 'balance', description: 'Balance mode: /balance [off|auto|light|medium|full]' })
     await $.command.register({ name: 'codex', description: 'Codex model and effort for this session: /codex [model] [effort]' })
     await $.command.register({ name: 'codex-log', description: 'Show the transcript of the latest Codex job in a pane' })
     await $.command.register({ name: 'codex-trust', description: 'Codex tier for this session: /codex-trust [safe|full]' })
@@ -366,6 +366,7 @@ export const register: Register = (on, options) => {
     // Subagents have no Agent tool: keep routing (and codex_run) to the orchestrator.
     if (!e.tools.includes('Agent')) return composed
     const c = await current($)
+    // Off still says so, so the session can tell "turned off" from "not loaded".
     const d = decide(c.mode, c.claude, c.codex, await $.clock.now())
     return {
       sections: [
@@ -376,6 +377,7 @@ export const register: Register = (on, options) => {
   })
 
   on('agent.spawn', async ($, e, next) => {
+    if ((await current($)).mode === 'off') return next(e)
     if (HAIKU_TYPES.has(e.subagentType)) return next({ ...e, model: 'haiku' })
     if (e.subagentType === 'coder' && !e.description.startsWith('[non-code]')) {
       const c = await current($)
@@ -549,7 +551,7 @@ export const register: Register = (on, options) => {
       )
     const claudePace = pace(c.claude)
     const codexPace = pace(c.codex)
-    const target = d.mode === 'full' ? 'codex' : d.mode === 'light' ? 'claude' : '50/50'
+    const target = d.mode === 'off' ? 'no routing' : d.mode === 'full' ? 'codex' : d.mode === 'light' ? 'claude' : '50/50'
 
     const mine = (
       <Box flexDirection="column">

@@ -12,6 +12,7 @@ It reads both quotas (Claude's 5h/7d windows and Codex's weekly window), works o
 | `medium` | about half Codex, half `coder` | orchestration, plans, reviews, half the code |
 | `full` | Codex, always (`coder` is refused unless its description starts with `[non-code]`) | orchestration, plans, reviews and critics only |
 | `auto` | picks `light`, `medium` or `full` from the quota pace below | depends on the pick |
+| `off` | no routing from the mod: Claude decides as it would without it | everything, unless you ask for Codex |
 
 In every mode, exploration, scouting and data handling go to `scout` (forced onto Haiku), and `designer`, `critic` and `gate-critic` stay on Claude.
 
@@ -22,13 +23,13 @@ In every mode, exploration, scouting and data handling go to `scout` (forced ont
 - **Band above the prompt**: mode chips, the Codex model and effort pickers, the Codex tier button, a `transcript` button, quota bars, and the current decision and pace. Each control is explained in [The band, control by control](#the-band-control-by-control).
 - **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort, which can be overridden per call.
 - **Codex transcript pane**: lists every Codex job of the session, each one expandable, with messages, commands with their exit status and the last lines of output, diffs, and the final answer.
-- **Commands**: `/balance [auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
+- **Commands**: `/balance [off|auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
 - **Routing policy**: injected into the orchestrator's system prompt only (subagents don't get it). It holds no live figures, so the prompt cache survives.
 
 ## The band, control by control
 
 ```
-balance [auto] [light] [medium] [full] │ codex [gpt-6.1-sol ▾] [xhigh ▾] [tier: safe] [transcript]   ▾
+balance [off] [auto] [light] [medium] [full] │ codex [gpt-6.1-sol ▾] [xhigh ▾] [tier: safe] [transcript]   ▾
 Claude 5h 9% · reset 1h                    Codex 7d 14% · reset 5d
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Claude 7d 67% · reset 1d                   read 8m ago · credits 62.5k
@@ -42,6 +43,7 @@ Everything you pick in the band applies to this session only. Defaults for the n
 
 The highlighted chip is the active mode. Picking one changes how the orchestrating Claude routes work from its next request on; `/balance <mode>` does the same.
 
+- **`off`**: the mod stops steering. Its only note to Claude is that balancing is off (use Claude subagents, Codex only when you ask); it doesn't force `scout` onto Haiku and doesn't refuse `coder`. The band, the quota bars, the transcript pane, the watchdog and `codex_run` keep working, and Codex launched through Bash is still refused: those are tools and safety, not routing. Pick it when you want plain Claude Code for a while.
 - **`light`**: Claude does almost everything. Codex gets only bounded code tasks: a clear spec, a known file list, implement plus tests, a refactor, a script. Pick it when Claude has quota to spare or the work needs Claude's context (MCP tools, live systems, client copy).
 - **`medium`**: code is split about half and half, alternating between Codex and the `coder` subagent. Pick it to spend both quotas evenly.
 - **`full`**: every code task (implementation, fixes, refactors, tests, scripts) goes to Codex. Claude only orchestrates, plans, reviews and criticizes. Launching `coder` is refused unless its description starts with `[non-code]` (client copy, tasks that need MCP or live context). Pick it when Claude's quota is the tight one.
