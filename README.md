@@ -24,7 +24,7 @@ In every mode, exploration, scouting and data handling go to `scout` (forced ont
 - **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort; a call can pick another model or a lower effort, never a higher one.
 - **Codex transcript pane**: lists every Codex job of the session, each one expandable, with messages, commands with their exit status and the last lines of output, diffs, and the final answer.
 - **Commands**: `/balance [off|auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
-- **Routing policy**: injected into the orchestrator's system prompt only (subagents don't get it). It holds no live figures, so the prompt cache survives.
+- **Routing policy**: a fixed section in the orchestrator's system prompt only (subagents don't get it). The live mode, Codex model and effort ride a short note on each prompt, so changing mode never busts the prompt cache.
 
 ## The band, control by control
 

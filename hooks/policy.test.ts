@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { bar, decide, parseCodexCredits, parseCodexLimits, policyText, pressure } from './policy'
+import { bar, decide, modeNote, parseCodexCredits, parseCodexLimits, policyText, pressure } from './policy'
 
 const NOW = Date.parse('2026-10-17T12:00:00Z')
 const iso = (minutesFromNow: number) => new Date(NOW + minutesFromNow * 60_000).toISOString()
@@ -34,17 +34,30 @@ test('reads the last rate_limits of a codex session file', () => {
   expect(parseCodexLimits('{"no":"limits"}')).toBe(undefined)
 })
 
-test('policy text names the routing and holds no live percentages', () => {
-  const text = policyText('full', { mode: 'full', why: 'manual' }, 'gpt-6.1-sol', 'xhigh', 'mcp__balancer__codex_run')
-  expect(text).toContain('Haiku 5.5')
-  expect(text).toContain('do not launch `coder` for code')
-  expect(/\d+%/.test(text)).toBe(false)
-  // Same mode, different pace: the prompt must not change.
-  const now = Date.parse('2026-10-17T12:00:00Z')
-  const at = (u: number) => [{ kind: 'seven_day', percentUsed: u, resetsAt: new Date(now + 3 * 86_400_000).toISOString() }]
-  const a = policyText('auto', decide('auto', at(70), at(10), now), 'm', 'xhigh', 't')
-  const b = policyText('auto', decide('auto', at(90), at(5), now), 'm', 'xhigh', 't')
-  expect(a).toBe(b)
+test('fixed policy contains every code rule and the off rule without figures', () => {
+  const text = policyText('mcp__balancer__codex_run')
+  expect(text).toContain('`scout` subagent (Haiku)')
+  expect(text).toContain('light: Code tasks: bounded ones (implement + tests, refactor, script, clear spec and file list) go to Codex via the codex_run tool; everything else code goes to the `coder` subagent.')
+  expect(text).toContain('medium: Code tasks: split about half and half between Codex (codex_run) and the `coder` subagent, alternating between them.')
+  expect(text).toContain('full: Code tasks: every implementation, fix, refactor, test or script goes to Codex via codex_run. Claude models only orchestrate, plan, review and criticize; do not launch `coder` for code.')
+  expect(text).toContain('off: The user turned Claude/Codex balancing off. Use Claude subagents as usual, and start Codex (`mcp__balancer__codex_run`) only when the user asks for it.')
+  expect(text).toContain('newest note wins')
+  expect(text).toContain("model and effort the latest note names; the note's effort is a ceiling")
+  expect(text).toContain('In off, ignore every bullet below except the off rule')
+  expect(text).toContain('in every mode except off')
+  expect(text).toContain('If no Balancer note is visible, start Codex only when the user asks')
+  expect(/\d/.test(text)).toBe(false)
+})
+
+test('mode notes name the manual or auto mode, model and effort', () => {
+  expect(modeNote('full', decide('full', [], [], NOW), 'gpt-6.1-sol', 'xhigh')).toBe(
+    'Balancer note: mode full (manual). Codex default gpt-6.1-sol at effort xhigh.',
+  )
+  const cool = [{ kind: 'seven_day', percentUsed: 10, resetsAt: iso(5040) }]
+  const hot = [{ kind: 'seven_day', percentUsed: 70, resetsAt: iso(5040) }]
+  expect(modeNote('auto', decide('auto', cool, hot, NOW), 'gpt-6-sol', 'low')).toBe(
+    'Balancer note: mode auto, acting as light (Codex is burning faster). Codex default gpt-6-sol at effort low.',
+  )
 })
 
 test('credits and bars', () => {
@@ -54,9 +67,7 @@ test('credits and bars', () => {
   expect(bar(140, 4)).toEqual(['━━━━', ''])
 })
 
-test('off routes nothing', () => {
+test('off routes nothing and its note omits model and effort', () => {
   expect(decide('off', [], [], 0).mode).toBe('off')
-  const off = policyText('off', decide('off', [], [], 0), 'm', 'xhigh', 't')
-  expect(off).toContain('balancing off')
-  expect(off.includes('Haiku')).toBe(false)
+  expect(modeNote('off', decide('off', [], [], 0), 'gpt-6.1-sol', 'xhigh')).toBe('Balancer note: off.')
 })

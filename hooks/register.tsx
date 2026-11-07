@@ -2,7 +2,7 @@ import { read, update } from 'claude-code'
 import type { EngineInterface, Register, ToolCallResult } from 'claude-code'
 
 import type { CodexJob, CodexModel, Mode, Win } from '../types'
-import { MODES, bar, decide, isMode, parseCodexCredits, parseCodexLimits, policyText, pressure, shortWindow, until } from './policy'
+import { MODES, bar, decide, isMode, modeNote, parseCodexCredits, parseCodexLimits, policyText, pressure, shortWindow, until } from './policy'
 import { MAX_MD, parseRollout, rolloutMeta, trimParts } from './rollout'
 import { TIERS, capEffort, codexCommand, codexProcessPattern, isCodexCommand, isInside, isTier, pickTier, stalledFor } from './codex'
 import type { Parsed } from './rollout'
@@ -362,19 +362,23 @@ export const register: Register = (on, options) => {
     return next(e)
   })
 
-  on('prompt.compose', async ($, e, next) => {
+  on('prompt.compose', async (_$, e, next) => {
     const composed = await next(e)
     // Subagents have no Agent tool: keep routing (and codex_run) to the orchestrator.
     if (!e.tools.includes('Agent')) return composed
-    const c = await current($)
-    // Off still says so, so the session can tell "turned off" from "not loaded".
-    const d = decide(c.mode, c.claude, c.codex, await $.clock.now())
     return {
       sections: [
         ...composed.sections,
-        { id: 'balancer:policy', text: policyText(c.mode, d, c.model, c.effort, TOOL), scope: 'session' as const },
+        { id: 'balancer:policy', text: policyText(TOOL), scope: 'session' as const },
       ],
     }
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    const c = await current($)
+    const d = decide(c.mode, c.claude, c.codex, await $.clock.now())
+    const note = modeNote(c.mode, d, c.model, c.effort)
+    return next({ ...e, context: [...(e.context ?? []), note] })
   })
 
   on('agent.spawn', async ($, e, next) => {

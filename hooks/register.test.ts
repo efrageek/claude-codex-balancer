@@ -1,5 +1,53 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+test('system policy stays fixed when mode, model and effort change; subagents get none', async ($, on) => {
+  mock.clock(on)
+  const base = { id: 'base', text: 'existing system section', scope: 'shared' as const }
+  const facts = { model: 'sonnet', promptModel: 'sonnet', surfaces: [], tools: ['Agent'], outputStyle: null, traits: [] }
+  on('prompt.compose', () => ({ sections: [base] }))
+  await $.command.run({ command: 'balance', args: 'medium' } as never)
+  const first = await $.prompt.compose(facts)
+  const policy = first.sections.find(s => s.id === 'balancer:policy')
+  expect(policy?.text).toContain('# Balancer: subagent routing')
+  expect(policy?.scope).toBe('session')
+  expect(first.sections[0]).toEqual(base)
+
+  await $.command.run({ command: 'codex', args: 'gpt-6-sol low' } as never)
+  for (const mode of ['full', 'auto', 'off']) {
+    await $.command.run({ command: 'balance', args: mode } as never)
+    expect((await $.prompt.compose(facts)).sections).toEqual(first.sections)
+  }
+  expect((await $.prompt.compose({ ...facts, tools: ['Read'] })).sections).toEqual([base])
+})
+
+test('every submitted prompt gets a note with the current mode, model and effort', async ($, on) => {
+  mock.clock(on)
+  const input = {
+    text: '/review cache', command: { name: 'review', args: 'cache' }, isMeta: true as const,
+    context: ['existing context'], wait: false, origin: { kind: 'composer' as const },
+  }
+  on('prompt.submit', (_$, e) => {
+    expect(e.text).toBe(input.text)
+    expect(e.command).toEqual(input.command)
+    expect(e.isMeta).toBe(input.isMeta)
+    return { text: e.text, context: e.context }
+  })
+  await $.command.run({ command: 'codex', args: 'gpt-6.1-sol xhigh' } as never)
+  await $.command.run({ command: 'balance', args: 'full' } as never)
+  for (let i = 0; i < 2; i++) {
+    const prompt = await $.prompt.submit(input)
+    expect(prompt.text).toBe(input.text)
+    expect(prompt.context).toEqual(['existing context', 'Balancer note: mode full (manual). Codex default gpt-6.1-sol at effort xhigh.'])
+  }
+  await $.command.run({ command: 'codex', args: 'gpt-6-sol low' } as never)
+  await $.command.run({ command: 'balance', args: 'medium' } as never)
+  expect((await $.prompt.submit(input)).context).toEqual([
+    'existing context', 'Balancer note: mode medium (manual). Codex default gpt-6-sol at effort low.',
+  ])
+  await $.command.run({ command: 'balance', args: 'off' } as never)
+  expect((await $.prompt.submit({ ...input, context: undefined })).context).toEqual(['Balancer note: off.'])
+})
+
 test('scout always runs on haiku; coder is refused in full mode', async ($, on) => {
   mock.clock(on)
   on('agent.spawn', (_$, e) => ({ model: e.model ?? 'inherit' }))
