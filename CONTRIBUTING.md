@@ -23,7 +23,7 @@ Typecheck: the engine writes `.claude-plugin/types/` (gitignored) when it loads 
 
 ## Release
 
-1. Bump `version` in `.claude-plugin/plugin.json`.
-2. Move the CHANGELOG entries under the new version and date.
-3. Merge, then run `claude plugin tag` (creates `balancer--v<version>`) and push the tag.
-4. Create a GitHub release from that tag.
+1. In one PR, bump `version` in `.claude-plugin/plugin.json`, rename `## [Unreleased]` in `CHANGELOG.md` to `## [X.Y.Z] - YYYY-MM-DD` with that version and its release date, and add a fresh empty `## [Unreleased]` above it. Release notes must be nonempty.
+2. Merge the PR into `main`. The Release workflow validates and tests the plugin, then creates the tag `balancer--vX.Y.Z` and a GitHub Release using that CHANGELOG section as notes. Versions with a pre-release suffix (such as `-rc.1`) are marked as prereleases.
+
+If that release already exists, the workflow does nothing, so reruns and `plugin.json` edits that keep the version are safe. If it fails (for example the CHANGELOG section is missing or still says Unreleased), fix it in a PR, then run the Release workflow by hand on `main` (Actions → Release → Run workflow): a CHANGELOG-only change doesn't trigger it. Release one version at a time; bumps merged back to back can skip a release, which the same manual run recovers.
