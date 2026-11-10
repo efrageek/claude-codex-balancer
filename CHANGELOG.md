@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- `AGENTS.md` with conventions for contributors and coding agents.
+
 ## [0.2.0] - 2026-11-10
 
 ### Added
