@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { capEffort, codexCommand, codexProcessPattern, isCodexCommand, isInside, pickTier, shellQuote, stalledFor } from './codex'
+import { capEffort, codexCommand, codexProcessPattern, fitEffort, homeRisk, isCodexCommand, isInside, pickTier, shellQuote, stalledFor } from './codex'
 
 test('the band effort caps the requested effort', () => {
   const order = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
@@ -13,6 +13,21 @@ test('the band effort caps the requested effort', () => {
 })
 
 const base = { model: 'gpt-6.1-sol', effort: 'low', dir: '/w/repo', prompt: "do it's job" }
+
+test('effort fits the model below the requested level regardless of cache order', () => {
+  const order = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra']
+  expect(fitEffort('xhigh', ['high', 'low', 'medium'], order)).toBe('high')
+  expect(fitEffort('medium', ['low', 'high'], order)).toBe('low')
+  expect(fitEffort('high', ['low', 'high'], order)).toBe('high')
+  expect(fitEffort('low', ['medium', 'high'], order)).toBe(undefined)
+  expect(fitEffort('high', [], order)).toBe(undefined)
+})
+
+test('without a model Codex uses its own default', () => {
+  const command = codexCommand({ ...base, model: '', tier: 'safe' })
+  expect(command.includes(' -m ')).toBe(false)
+  expect(command).toContain('codex exec --ignore-user-config -c ')
+})
 
 test('safe runs without the user config, full with it, never dangerous', () => {
   const safe = codexCommand({ ...base, tier: 'safe', writableDirs: ['/x'], isNetworked: true })
@@ -77,4 +92,16 @@ test('inside a root', () => {
   expect(isInside('/a', '/a')).toBe(true)
   expect(isInside('/ab', '/a')).toBe(false)
   expect(shellQuote("it's")).toBe(`'it'\\''s'`)
+})
+
+test('home risks reject ancestors and top-level hidden folders, allowing sibling prefixes and projects', () => {
+  for (const path of ['/home/test', '/', '/home']) {
+    expect(homeRisk(path, '/home/test')).toBe('is too broad (it holds your home folder).')
+  }
+  for (const path of ['/home/test/.ssh', '/home/test/.config/app']) {
+    expect(homeRisk(path, '/home/test')).toBe('is inside a hidden folder under your home.')
+  }
+  for (const path of ['/home/testing', '/home/test/projects/app', '/home/test/projects/.cache']) {
+    expect(homeRisk(path, '/home/test')).toBe(undefined)
+  }
 })

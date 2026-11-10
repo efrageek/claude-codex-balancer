@@ -19,8 +19,8 @@ function code(text: string): string {
   return run ? `${f} ${text} ${f}` : `${f}${text}${f}`
 }
 
-// Markdown takes no control characters but tab and newline: drop ANSI escapes and the rest.
-const clean = (s: string) => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')
+// Drop ANSI escapes, controls except tab/newline, and bidi controls.
+const clean = (s: string) => s.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, '').replace(/\r\n?/g, '\n').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/g, '')
 
 const lines = (s: string) => clean(s).replace(/\n+$/, '').split('\n')
 

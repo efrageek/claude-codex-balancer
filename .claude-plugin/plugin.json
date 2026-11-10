@@ -1,7 +1,12 @@
 {
   "name": "balancer",
-  "version": "0.1.1",
-  "description": "Balances subagent work between Claude models and Codex CLI by quota: auto, light, medium, full.",
+  "version": "0.2.0",
+  "description": "Balances subagent work between Claude models and Codex CLI by quota: off, auto, light, medium, full.",
+  "author": { "name": "Efrain P. Jaimes", "url": "https://github.com/efrageek" },
+  "homepage": "https://github.com/efrageek/claude-codex-balancer",
+  "repository": "https://github.com/efrageek/claude-codex-balancer",
+  "license": "MIT",
+  "keywords": ["claude-code", "codex", "quota", "routing", "subagents"],
   "types": "./types/index.d.ts",
   "userConfig": {
     "mode": {
@@ -14,8 +19,8 @@
     "codexModel": {
       "type": "string",
       "title": "Default Codex model",
-      "description": "A slug from ~/.codex/models_cache.json.",
-      "default": "gpt-6.1-sol"
+      "description": "A model slug; empty uses the first model your Codex lists in ~/.codex/models_cache.json.",
+      "default": ""
     },
     "codexEffort": {
       "type": "string",
@@ -29,6 +34,42 @@
       "title": "Codex stall warning (minutes)",
       "description": "Warn when a running Codex job writes nothing for this long. Raise it if your jobs run long silent test suites.",
       "default": 15
+    },
+    "exploreAgent": {
+      "type": "string",
+      "title": "Exploration agent",
+      "description": "Subagent type for exploration and data handling, forced onto Haiku; empty leaves the role unset.",
+      "default": "Explore"
+    },
+    "codeAgent": {
+      "type": "string",
+      "title": "Code agent",
+      "description": "Subagent type for code on Claude, refused for code in full mode; empty leaves the role unset.",
+      "default": ""
+    },
+    "planAgent": {
+      "type": "string",
+      "title": "Planning agent",
+      "description": "Claude subagent type for plans and design; empty leaves the role unset.",
+      "default": "Plan"
+    },
+    "reviewAgent": {
+      "type": "string",
+      "title": "Review agent",
+      "description": "Claude subagent type for reviews after Codex jobs; empty asks the orchestrator to review the change itself.",
+      "default": ""
+    },
+    "gateAgent": {
+      "type": "string",
+      "title": "Final gate agent",
+      "description": "Claude subagent type for the final pre-merge gate; empty leaves the role unset.",
+      "default": ""
+    },
+    "codexInstructions": {
+      "type": "string",
+      "title": "Extra Codex instructions",
+      "description": "An extra line appended to every Codex job prompt; empty adds nothing.",
+      "default": ""
     }
   }
 }
