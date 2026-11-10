@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [.claude-plugin/plugin.json]
+  workflow_dispatch:
+
+concurrency: release
+
+jobs:
+  release:
+    # A manual run from another branch must not release it.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - run: npm install -g @anthropic-ai/claude-code@2.1.300
+      # Plugin code runs here, so this step gets no token.
+      - run: claude plugin validate . && claude plugin test .
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(node -p 'require("./.claude-plugin/plugin.json").version')"
+          tag="balancer--v$version"
+          # Keyed on the release, not the tag, so a run that tagged but failed to release can be re-run.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::notice::Release $tag already exists; nothing to do."
+            exit 0
+          fi
+
+          notes="$(mktemp)"
+          node - "$version" "$notes" <<'NODE'
+          const fs = require('node:fs');
+          const [version, output] = process.argv.slice(2);
+          const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+          const start = lines.findIndex(line => line === `## [${version}]` || line.startsWith(`## [${version}] - `));
+          const fail = message => { console.error(`Release notes: ${message}`); process.exit(1); };
+          if (start === -1) fail(`missing CHANGELOG section for ${version}.`);
+          if (!/^## \[[^\]]+\] - \d{4}-\d{2}-\d{2}\s*$/.test(lines[start])) {
+            fail(`section for ${version} must be dated YYYY-MM-DD, not Unreleased.`);
+          }
+          let end = start + 1;
+          while (end < lines.length && !lines[end].startsWith('## [')) end++;
+          const notes = lines.slice(start + 1, end).join('\n').trim();
+          if (!notes) fail(`empty CHANGELOG section for ${version}.`);
+          fs.writeFileSync(output, notes + '\n');
+          NODE
+
+          prerelease=()
+          # A hyphen before any +build metadata marks a pre-release (1.0.0-rc.1).
+          if [[ "${version%%+*}" == *-* ]]; then
+            prerelease=(--prerelease)
+          fi
+          # Creates the tag on this exact commit if it doesn't exist yet.
+          gh release create "$tag" --target "$GITHUB_SHA" --title "balancer $version" --notes-file "$notes" "${prerelease[@]}"
