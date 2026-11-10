@@ -86,6 +86,8 @@ export function isInside(path: string, root: string): boolean {
 }
 
 export function homeRisk(path: string, home: string): string | undefined {
+  path = path.toLowerCase()
+  home = home.toLowerCase()
   if (isInside(home, path)) return 'is too broad (it holds your home folder).'
   if (isInside(path, home) && path.slice(home.length + 1).startsWith('.')) return 'is inside a hidden folder under your home.'
 }

@@ -204,6 +204,25 @@ test('full refuses a writable path that is a file', async ($, on) => {
   expect(calls.commands).toEqual([])
 })
 
+for (const target of ['safe dir', 'full dir', 'writable dir']) {
+  test(`${target} refuses resolved control and bidi characters before confirmation`, async ($, on) => {
+    const realPaths: Record<string, string> = {}
+    const calls = jobMocks(on, realPaths)
+    await $.command.run({ command: 'codex-trust', args: 'full', origin: { kind: 'composer' } } as never)
+    for (const char of ['\u0000', '\u0009', '\u000a', '\u001b', '\u001f', '\u007f', '\u0085', '\u009f', '\u202a', '\u202e', '\u2066', '\u2069']) {
+      const writable = target === 'writable dir'
+      realPaths[writable ? '/extra/link' : '/w/repo'] = `/w/repo/unsafe${char}path`
+      const r = await $.tool.call({
+        tool: TOOL, dir: '/w/repo', capabilities: target === 'safe dir' ? 'safe' : 'full',
+        ...(writable ? { writable_dirs: ['/extra/link'] } : {}),
+      } as never)
+      expect(r.deny ?? r.text).toBe(`balancer: ${writable ? 'writable dir' : 'dir'} must not contain control or bidi characters.`)
+    }
+    expect(calls.questions).toEqual([])
+    expect(calls.commands).toEqual([])
+  })
+}
+
 test('safe ignores writable dirs in validation, confirmation and the command', async ($, on) => {
   const calls = jobMocks(on)
   const r = await $.tool.call({ tool: TOOL, dir: '/w/repo', writable_dirs: ['relative', '/extra/file'], network: true } as never)

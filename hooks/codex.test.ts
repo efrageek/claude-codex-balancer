@@ -95,6 +95,8 @@ test('inside a root', () => {
 })
 
 test('home risks reject ancestors and top-level hidden folders, allowing sibling prefixes and projects', () => {
+  expect(homeRisk('/users/alice/.ssh', '/Users/alice')).toBe('is inside a hidden folder under your home.')
+  expect(homeRisk('/USERS/alice', '/Users/alice')).toBe('is too broad (it holds your home folder).')
   for (const path of ['/home/test', '/', '/home']) {
     expect(homeRisk(path, '/home/test')).toBe('is too broad (it holds your home folder).')
   }

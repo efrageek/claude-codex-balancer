@@ -227,6 +227,8 @@ async function runCodex($: $, e: { tool_use_id?: string; agentId?: string }): Pr
   if (!dir.startsWith('/')) return { deny: 'balancer: dir must be an absolute path.' }
   const real = (await $.fs.stat(dir, { resolve: true }).catch(() => undefined))?.realPath
   if (!real) return { deny: `balancer: ${dir} does not exist.` }
+  const unsafePath = /[\x00-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/
+  if (unsafePath.test(real)) return { deny: 'balancer: dir must not contain control or bidi characters.' }
   const stat = await $.fs.stat(`${real}/TASK.md`).catch(() => undefined)
   if (stat?.kind !== 'file') return { deny: `balancer: ${real}/TASK.md not found. Write the task there first.` }
   // Only the person unlocks full, by /codex-trust full or the band button: never the model.
@@ -254,6 +256,7 @@ async function runCodex($: $, e: { tool_use_id?: string; agentId?: string }): Pr
       const stat = d.startsWith('/') ? await $.fs.stat(d, { resolve: true }).catch(() => undefined) : undefined
       const r = stat?.realPath
       if (!r) return { deny: `balancer: writable dir ${d} must be an existing absolute path.` }
+      if (unsafePath.test(r)) return { deny: 'balancer: writable dir must not contain control or bidi characters.' }
       if (stat.kind !== 'dir') return { deny: `balancer: writable dir ${r} must be a directory.` }
       const risk = homeRisk(r, h)
       if (risk) return { deny: `balancer: writable dir ${r} ${risk}` }
