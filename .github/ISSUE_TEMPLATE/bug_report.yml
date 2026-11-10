@@ -1,0 +1,30 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Claude Code (`claude --version`), Codex CLI, and balancer.
+    validations:
+      required: true
+  - type: input
+    id: mode
+    attributes:
+      label: Mode and tier
+      placeholder: "light, tier safe"
+  - type: input
+    id: os
+    attributes:
+      label: OS
+      placeholder: "Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what you expected
+      description: Steps to reproduce help most. Remove secrets and private paths from any output.
+    validations:
+      required: true

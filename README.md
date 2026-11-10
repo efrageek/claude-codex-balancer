@@ -1,32 +1,32 @@
+<div align="center">
+
+<img src="assets/logo.svg" width="128" alt="balancer logo: a pixel-art seesaw">
+
 # balancer
 
-A Claude Code mod that balances subagent work between Claude models and the Codex CLI by quota.
+Routes Claude Code subagent work between Claude and Codex by live quota pace.
 
-It reads both quotas (Claude's 5h/7d windows and Codex's weekly window), works out how fast each is burning, and tells the orchestrating Claude where to send each kind of task. Codex runs show up as native background tasks, and a pane renders their full transcripts.
+[![License: MIT](https://img.shields.io/github/license/efrageek/claude-codex-balancer)](LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/efrageek/claude-codex-balancer/ci.yml?branch=main&label=CI)](https://github.com/efrageek/claude-codex-balancer/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/efrageek/claude-codex-balancer)](https://github.com/efrageek/claude-codex-balancer/releases)
+![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-no%20dependencies-blue)
 
-## Modes
+```
+claude plugin install balancer --marketplace efrageek/claude-codex-balancer
+```
 
-| Mode | Code tasks go to | Claude models are used for |
-|---|---|---|
-| `light` (default) | Codex only for bounded tasks (clear spec and file list); the rest to `coder` | almost everything |
-| `medium` | about half Codex, half `coder` | orchestration, plans, reviews, half the code |
-| `full` | Codex, always (`coder` is refused unless its description starts with `[non-code]`) | orchestration, plans, reviews and critics only |
-| `auto` | picks `light`, `medium` or `full` from the quota pace below | depends on the pick |
-| `off` | no routing from the mod: Claude decides as it would without it | everything, unless you ask for Codex |
+</div>
 
-In every mode, exploration, scouting and data handling go to `scout` (forced onto Haiku), and `designer`, `critic` and `gate-critic` stay on Claude.
+## What it does
 
-**Pace** is the share of a quota used divided by the share of its window already elapsed. At 1.0x the quota runs out exactly at reset; above 1x it runs out early. `auto` sends code to the provider with the lower pace when one burns more than 1.25x faster than the other. It falls back to `medium` while either quota has no reading, and moves away from a provider that is 95% used.
+`balancer` reads both quotas (Claude's 5h/7d windows and Codex's weekly window), works out how fast each is burning, and tells the orchestrating Claude where to send each kind of task. Codex runs show up as native background tasks, and a pane renders their full transcripts.
 
-## What it adds
-
-- **Band above the prompt**: mode chips, the Codex model and effort pickers, the Codex tier button, a `transcript` button, quota bars, and the current decision and pace. Each control is explained in [The band, control by control](#the-band-control-by-control).
-- **`mcp__balancer__codex_run`**: a tool that runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. It defaults to the session's model and effort; a call can pick another model or a lower effort, never a higher one.
-- **Codex transcript pane**: lists every Codex job of the session, each one expandable, with messages, commands with their exit status and the last lines of output, diffs, and the final answer.
+- **Band above the prompt**: mode chips, Codex model and effort pickers, the tier button, a `transcript` button, quota bars, and the current decision and pace. See [the band, control by control](docs/band.md).
+- **`mcp__balancer__codex_run`**: runs `codex exec` as a native background task in a working copy that already holds `TASK.md`. A call can pick another model or a lower effort, never a higher one.
+- **Codex transcript pane**: every Codex job of the session, expandable, with messages, commands and their exit status, diffs and the final answer. A watchdog warns when a job stalls.
 - **Commands**: `/balance [off|auto|light|medium|full]`, `/codex [model] [effort]`, `/codex-trust [safe|full]`, `/codex-log`.
-- **Routing policy**: injected into the orchestrator's system prompt only (subagents don't get it). It holds no live figures, so the prompt cache survives.
-
-## The band, control by control
+- **Routing policy**: a fixed section in the orchestrator's system prompt only (subagents don't get it). The live mode, model and effort ride a short note on each prompt, so changing mode never busts the prompt cache.
 
 ```
 balance [off] [auto] [light] [medium] [full] │ codex [gpt-6.1-sol ▾] [xhigh ▾] [tier: safe] [transcript]   ▾
@@ -37,108 +37,93 @@ Claude 7d 67% · reset 1d                   read 8m ago · credits 62.5k
 medium → 50/50 · pace Claude 0.8x · Codex 0.4x
 ```
 
-Everything you pick in the band applies to this session only. Defaults for the next session come from the plugin's config menu.
+## Quick start
 
-### `balance` chips: the mode
+1. Install: run the command above, or in a session `/plugin marketplace add efrageek/claude-codex-balancer` then `/plugin install balancer@claude-codex-balancer`.
+2. Make sure the Codex CLI is installed and logged in.
+3. Start a session and pick a mode in the band, or type `/balance auto`.
 
-The highlighted chip is the active mode. Picking one changes how the orchestrating Claude routes work from its next request on; `/balance <mode>` does the same.
+## Modes
 
-- **`off`**: the mod stops steering. Its only note to Claude is that balancing is off (use Claude subagents, Codex only when you ask); it doesn't force `scout` onto Haiku and doesn't refuse `coder`. The band, the quota bars, the transcript pane, the watchdog and `codex_run` keep working, and Codex launched through Bash is still refused: those are tools and safety, not routing. Pick it when you want plain Claude Code for a while.
-- **`light`**: Claude does almost everything. Codex gets only bounded code tasks: a clear spec, a known file list, implement plus tests, a refactor, a script. Pick it when Claude has quota to spare or the work needs Claude's context (MCP tools, live systems, client copy).
-- **`medium`**: code is split about half and half, alternating between Codex and the `coder` subagent. Pick it to spend both quotas evenly.
-- **`full`**: every code task (implementation, fixes, refactors, tests, scripts) goes to Codex. Claude only orchestrates, plans, reviews and criticizes. Launching `coder` is refused unless its description starts with `[non-code]` (client copy, tasks that need MCP or live context). Pick it when Claude's quota is the tight one.
-- **`auto`**: the mod picks `light`, `medium` or `full` for you from the pace of each quota, and the last line of the band shows what it picked and why (`auto → codex (Claude is burning faster)`). It is `medium` while either quota has no reading, `full` when Claude is 95% used, `light` when Codex is 95% used, and otherwise moves code to whichever side burns more than 1.25x slower.
-
-Whatever the mode, exploration, scouting and data handling go to `scout` on Haiku, and plans, reviews and the final gate stay on Claude.
-
-### `codex` pickers: model and effort
-
-- **Model** (`gpt-6.1-sol ▾`): the Codex model every `codex_run` job uses by default. The list comes from the models your Codex account can see (`~/.codex/models_cache.json`).
-- **Effort** (`xhigh ▾`): Codex's reasoning effort, from `low` to `ultra`. Only the levels the chosen model supports are offered. Higher effort thinks longer and spends more Codex quota per job.
-
-The orchestrator can still pick another model for a single job when a task clearly needs it. Effort is different: the band's effort is a ceiling. The orchestrator may lower it for a small job (a trivial edit at `low`), but a higher request is capped to the band's level and the tool result says so. `/codex [model] [effort]` does the same as the pickers; `/codex high` changes only the effort.
-
-### `tier:` button: what Codex may touch
-
-Pressing it toggles between `safe` and `full` for this session; `/codex-trust safe|full` does the same. It is the tier new Codex jobs run in: with `full` on, jobs get your whole Codex unless the model asks for `safe` on a job that doesn't need it. See [Codex tiers](#codex-tiers) below for what each one allows. Switching to `full` is your call: while it is off, the model is told to ask you and say why, and `codex_run` refuses `full`. Each `full` job still asks you to confirm before it starts.
-
-### `transcript` button
-
-It appears once the session has run a Codex job, and opens the **Codex transcript** pane (also `/codex-log`):
-
-- One row per job, newest first: `▸ 12:23 smoke · gpt-6.1-sol/low · ✓ 15s`. The status reads `● running`, `✓` with its duration when done, `… waiting` before Codex opens its session, `⚠ stalled` or `■ stopped` (see the watchdog below).
-- Press a row to unfold or fold it. Several can be open at once; a new job opens on its own.
-- An unfolded job shows the task Codex got, its comments, each command with `✓` or `✗ exit N` and the last 12 lines of its output, file changes as short diffs, and the final answer.
-- It refreshes every few seconds while a job runs. On a very long run the oldest steps are hidden and the newest kept.
-
-**Watchdog.** Once a minute the plugin checks every running job. When one has written nothing to its rollout for the stall time (15 minutes by default, `stallMinutes` in the plugin config), or has not opened a Codex session after that long, it shows a toast, marks the row `⚠ stalled`, and wakes the session once with the reason, so the orchestrator can look or stop it. If the job moves again, the warning re-arms. A job whose process is gone without finishing shows `■ stopped`; finishing and dying are already reported by the background task's own notification, so the watchdog stays quiet about those. Raise `stallMinutes` if your jobs run long silent test suites.
-
-Codex jobs also show up in Claude Code's own **Background tasks** list, next to subagents. That list shows Codex's raw output; the pane is the readable version.
-
-### Quota bars
-
-- **Left column, Claude**: one bar per window Claude reports, 5 hours and 7 days. The label gives the share used and when that window resets. The first reading arrives with Claude's first reply in the session.
-- **Right column, Codex**: the weekly window, read from Codex's own session logs. `read 8m ago` says how old that reading is, because Codex only records it while it runs; `credits` is your remaining Codex credit balance.
-
-### Last line: decision and pace
-
-`medium → 50/50` is where code goes now: `codex`, `claude` or `50/50`. In `auto` it adds the reason. **Pace** is the share of a quota used divided by the share of its window already elapsed. At 1.0x it runs out exactly at reset; below 1x you will finish the window with quota left; above 1x it runs out early, and the line turns to a warning color. The worse window of each side is shown.
-
-### `▾` / `▴`
-
-`▾` collapses the band to its control row and `▴` expands it again. This one choice is remembered across sessions.
-
-## Codex tiers
-
-Every `codex_run` job runs in Codex's `workspace-write` sandbox. Nothing ever passes `danger-full-access` or `--dangerously-*`.
-
-| Tier | What Codex gets | Who picks it |
+| Mode | Code tasks go to | Claude models are used for |
 |---|---|---|
-| `safe` (default) | `--ignore-user-config`: none of your Codex plugins, MCP servers or hooks, and no network. It writes only in `dir`, which must sit inside the session's folder (a worktree works). | the default; the model can also pick it for one job while `full` is on |
-| `full` | your whole Codex config (plugins, MCP servers, hooks), plus optional `network: true` and `writable_dirs`, and any `dir` | you, for this session only, with `/codex-trust full` or the `tier:` button in the band; then it is the default for new jobs |
+| `light` (default) | Codex only for bounded tasks (clear spec and file list); the rest to a Claude subagent | almost everything |
+| `medium` | about half Codex, half a Claude subagent | orchestration, plans, reviews, half the code |
+| `full` | Codex, always (your `codeAgent` is refused unless its description starts with `[non-code]`) | orchestration, plans, reviews and critics only |
+| `auto` | picks `light`, `medium` or `full` from the quota pace below | depends on the pick |
+| `off` | no routing from the mod: Claude decides as it would without it | everything, unless you ask for Codex |
 
-While `full` is off, the model asks you for it when a task needs it and tells you why; it cannot switch it on. `/codex-trust full` only works when typed at the prompt, not when it arrives as a relayed message. The unlock is not saved, so each session starts in `safe`. In `full`, `writable_dirs` may not be `/` or your home folder (or anything holding it).
+In every mode except `off`, exploration, scouting and data handling go to your exploration agent (forced onto Haiku), and plans, reviews and the final gate stay on Claude.
 
-"The session's folder" is the folder the session runs in when the job starts; if the session moves to another folder, the allowed area moves with it.
+**Pace** is the share of a quota used divided by the share of its window already elapsed. At 1.0x the quota runs out exactly at reset; above 1x it runs out early. `auto` sends code to the provider with the lower pace when one burns more than 1.25x faster than the other. It falls back to `medium` while either quota has no reading, and moves away from a provider that is 95% used.
 
-What stays risky in `full`: Codex is then your whole agent. A prompt injected through `TASK.md` or repository content could use your Codex plugins (Slack, browser, computer use) or read files outside the repo. Unlock it only for tasks that need it.
+## Safety
 
-## Install
+Every Codex job runs in Codex's `workspace-write` sandbox; nothing passes `danger-full-access`.
+
+| Tier | What Codex gets |
+|---|---|
+| `safe` (default) | none of your Codex plugins, MCP servers or hooks, no network, writes only in a folder inside the session's folder |
+| `full` | your whole Codex config, optional network and extra writable dirs; you unlock it per session with `/codex-trust full` or the `tier:` button |
+
+- You confirm each job in Claude Code's own dialog, unless your permission rules allow `codex_run`. A `safe` job offers "don't ask again this session"; a `full` job asks every time.
+- Only the main session can start jobs, and the model cannot unlock `full`.
+- Codex launched through Bash is refused. That guard is best-effort; your permission prompt is the real boundary, so keep `Bash(codex exec:*)` and `mcp__balancer__codex_run` out of `permissions.allow`.
+
+Details: [Codex tiers and permissions](docs/codex-tiers.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
+## Configuration
+
+Set defaults with `/plugin configure balancer@claude-codex-balancer` in a session, or `claude plugin configure balancer@claude-codex-balancer` in a terminal. The band and commands change mode, model and effort for the current session only.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `mode` | `light` | Default balance mode: `off`, `auto`, `light`, `medium`, `full` |
+| `codexModel` | empty | Default Codex model slug; empty = the first model your Codex account lists in `~/.codex/models_cache.json`, else Codex's own default |
+| `codexEffort` | `xhigh` | Default Codex reasoning effort and the ceiling for jobs; if the model lacks it, jobs use the highest level it supports below it |
+| `stallMinutes` | `15` | Warn when a running Codex job writes nothing for this long |
+| `exploreAgent` | `Explore` | Subagent type for exploration, scouting, reading; the mod runs it (and the built-in Explore) on Haiku; empty = no exploration rule |
+| `codeAgent` | empty | Subagent type for code that stays on Claude; when set, mode `full` refuses it for code unless its description starts with `[non-code]`; empty = "a Claude subagent", no refusal |
+| `planAgent` | `Plan` | Subagent type for plans and design; empty = no rule |
+| `reviewAgent` | empty | Subagent type for reviews, including the review after each Codex job; empty = the orchestrator reviews the change itself |
+| `gateAgent` | empty | Subagent type for the final pre-merge gate; empty = no gate rule |
+| `codexInstructions` | empty | One extra line appended to every Codex job prompt (for example a house coding-style rule) |
+
+### Use your own agents
+
+By default the routing policy only names Claude Code's built-in `Explore` and `Plan` agents. If you keep your own subagents in `~/.claude/agents/`, point the roles at them, for example:
 
 ```
-/plugin install balancer --marketplace efrageek/claude-codex-balancer
+echo '{"exploreAgent":"explorer","codeAgent":"coder","planAgent":"architect","reviewAgent":"reviewer","gateAgent":"final-reviewer","codexInstructions":"Keep diffs small and add a test for new logic."}' \
+  | claude plugin configure balancer@claude-codex-balancer --values-stdin
 ```
-
-This is a private repository: installing needs GitHub access to it on your machine.
-
-No permission rule is needed. The plugin allows only the exact command it built itself (matched by the plugin's own origin, which nothing else can forge).
-
-Keep these out of `permissions.allow`:
-
-- `Bash(codex exec:*)` or any broad Bash rule: it would let the model run Codex with any flags (sandbox bypass, MCP commands) without asking.
-- `mcp__balancer__codex_run`: leave it unlisted so you confirm each Codex job (see below).
-- Other shell tools (desktop-commander `start_process`, terminal tools, Monitor): the Codex guard only covers Bash.
-
-The plugin also refuses Bash commands that look like a Codex launch (`codex` or `codex.js` as a word, or a path ending in `/codex`), including wrappers such as `timeout 20 codex`. This is a convenience, not the security boundary: a determined spelling can slip past it, and then your normal permission prompt is what stops it, so the rules above matter. It also refuses lowercase prose such as `-m "fix codex runs"`; capitalize or rephrase it.
-
-Only the main session can start Codex jobs: `codex_run` refuses calls from subagents.
-
-**Confirming jobs.** Before each Codex job the plugin asks you in Claude Code's own dialog, showing the tier, model, effort, folder, and any extra dirs or network. A `safe` job offers "Run, don't ask again this session", so in auto mode you confirm once; a `full` job asks every time. If your permission rules allow `codex_run` (or you run with permissions bypassed) it starts without asking; if they deny it, it never starts; with no one to ask (`claude -p`) it is refused.
-
-Defaults (mode, Codex model, Codex effort) are set in the plugin's config menu. The band and the commands change them for the current session only.
 
 ## Requirements
 
-- Claude Code with mod (hooks module) support.
-- Codex CLI logged in. Quotas are read from `~/.codex/sessions/**/*.jsonl` and models from `~/.codex/models_cache.json`.
-- Where an organization manages Claude Code, `prompt.compose` hooks don't run for user-installed plugins. The routing policy is then not injected, but the Haiku override and the `coder` refusal in `full` still apply.
+- Claude Code with mod (hooks module) support, tested on 2.1.300.
+- Codex CLI installed and logged in. Quotas are read from `~/.codex/sessions/**/*.jsonl` and models from `~/.codex/models_cache.json`.
+- macOS or Linux (it calls `pgrep`, `head` and `tail`). Windows is untested.
 
-## Develop
+## Troubleshooting
+
+- **The band says Codex has no reading**: is the Codex CLI installed and logged in? Codex only records its quota while it runs, so run one Codex task, then check again. `auto` acts as `medium` until then.
+- **No routing policy in an organization-managed Claude Code**: `prompt.compose` hooks don't run for user-installed plugins there, so the policy isn't injected. The Haiku override and the `full`-mode refusal still apply.
+- **A job runs at a lower effort than configured**: the model does not support that level, so the job uses the highest one it supports below it. Pick another model with `/codex <model>`.
+- **A Bash command is refused for mentioning Codex**: capitalize or rephrase the word, or use `codex_run`.
+
+## Uninstall
 
 ```
-claude --plugin-dir .
-claude plugin validate .
-claude plugin test .
+claude plugin uninstall balancer@claude-codex-balancer
+claude plugin marketplace remove claude-codex-balancer   # optional
 ```
 
-`hooks/policy.ts` (quota pace, mode decision, policy text) and `hooks/rollout.ts` (transcript rendering) are pure and tested. `hooks/register.tsx` wires the hooks, the band, the pane and the tool.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Changes are listed in [CHANGELOG.md](CHANGELOG.md).
+
+## License
+
+[MIT](LICENSE) © 2026 Efrain P. Jaimes
+
+Not affiliated with, endorsed by, or sponsored by Anthropic or OpenAI. Claude and Claude Code are trademarks of Anthropic, PBC. Codex and OpenAI are trademarks of OpenAI.

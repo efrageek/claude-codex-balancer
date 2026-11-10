@@ -17,6 +17,12 @@ export function capEffort(requested: string | undefined, ceiling: string, order:
   return at > max && max >= 0 ? ceiling : requested
 }
 
+// Highest supported level not above the request; undefined when none fits.
+export function fitEffort(effort: string, supported: readonly string[], order: readonly string[]): string | undefined {
+  if (supported.includes(effort)) return effort
+  return [...order].reverse().find(l => supported.includes(l) && order.indexOf(l) <= order.indexOf(effort))
+}
+
 export function shellQuote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`
 }
@@ -38,8 +44,7 @@ export function codexCommand(run: CodexRun): string {
   return [
     'codex exec',
     isFull ? '' : '--ignore-user-config',
-    '-m',
-    shellQuote(run.model),
+    run.model ? `-m ${shellQuote(run.model)}` : '',
     '-c',
     shellQuote(`model_reasoning_effort="${run.effort}"`),
     isFull && run.isNetworked ? `-c ${shellQuote('sandbox_workspace_write.network_access=true')}` : '',
@@ -78,4 +83,11 @@ export function codexProcessPattern(dir: string): string {
 export function isInside(path: string, root: string): boolean {
   const r = root.endsWith('/') ? root : `${root}/`
   return path === root || path.startsWith(r)
+}
+
+export function homeRisk(path: string, home: string): string | undefined {
+  path = path.toLowerCase()
+  home = home.toLowerCase()
+  if (isInside(home, path)) return 'is too broad (it holds your home folder).'
+  if (isInside(path, home) && path.slice(home.length + 1).startsWith('.')) return 'is inside a hidden folder under your home.'
 }

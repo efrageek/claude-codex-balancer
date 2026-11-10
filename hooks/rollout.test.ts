@@ -49,9 +49,9 @@ test('long command output keeps its tail', () => {
 })
 
 test('control characters never reach the pane', () => {
-  const r = renderRollout(done({ type: 'CommandExecution', command: ['bash', '-lc', 'x'], aggregated_output: '\x1b[31mred\x1b[0m\r\nok\x07', exit_code: 0 }))
+  const r = renderRollout(done({ type: 'CommandExecution', command: ['bash', '-lc', 'x'], aggregated_output: '\x1b[31mred\x1b[0m\r\nok\x07\x80\x9f\u202a\u202e\u2066\u2069', exit_code: 0 }))
   expect(r.markdown).toContain('red\nok')
-  expect(/[\x00-\x08\x0b-\x1f\x7f]/.test(r.markdown)).toBe(false)
+  expect(/[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]/.test(r.markdown)).toBe(false)
 })
 
 test('meta', () => {

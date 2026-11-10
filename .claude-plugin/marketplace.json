@@ -1,5 +1,6 @@
 {
   "name": "claude-codex-balancer",
+  "description": "Balances Claude and Codex subagent work by live quota pace.",
   "owner": { "name": "Efrain P. Jaimes" },
   "plugins": [{ "name": "balancer", "source": "./" }]
 }
